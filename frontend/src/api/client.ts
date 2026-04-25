@@ -5,11 +5,15 @@ const client = axios.create({
   timeout: 120000,
 })
 
-// Request interceptor: attach session_id
+// Request interceptor: attach session_id and project_id
 client.interceptors.request.use((config) => {
   const sessionId = localStorage.getItem('session_id')
   if (sessionId) {
     config.params = { ...config.params, session_id: sessionId }
+  }
+  const projectId = localStorage.getItem('project_id')
+  if (projectId) {
+    config.params = { ...config.params, project_id: projectId }
   }
   return config
 })

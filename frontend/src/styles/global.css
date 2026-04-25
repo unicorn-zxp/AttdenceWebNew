@@ -1,0 +1,111 @@
+/* ============================================
+   Global Styles
+   ============================================ */
+@import './variables.css';
+
+/* --- Base --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Transitions --- */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-base);
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all var(--transition-base);
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Stagger entrance animation */
+.stagger-item {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: stagger-in var(--transition-slow) forwards;
+}
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 80ms; }
+.stagger-item:nth-child(3) { animation-delay: 160ms; }
+.stagger-item:nth-child(4) { animation-delay: 240ms; }
+
+@keyframes stagger-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Element Plus Global Tweaks --- */
+
+/* Card: no thick border, lighter shadow by default */
+.el-card {
+  --el-card-border-color: var(--color-border-light);
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.el-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+.el-card__header {
+  border-bottom-color: var(--color-border-light);
+}
+
+/* Table header */
+.el-table th.el-table__cell {
+  background-color: var(--color-bg) !important;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* Table stripe */
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--color-border-light);
+}
+
+/* --- Layout helpers --- */
+.section-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-4) 0;
+}
+
+/* --- Responsive --- */
+@media (max-width: 1280px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+}

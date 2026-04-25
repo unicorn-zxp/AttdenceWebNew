@@ -38,6 +38,7 @@ export interface UploadStatus {
   attendance: boolean
   ledger: boolean
   attendance_count: number
+  project_id?: number
 }
 
 export interface SalaryResponse {
@@ -54,4 +55,19 @@ export interface CalculateResponse {
   overview: OverviewStats
   sheet_name: string
   abnormal_count: number
+}
+
+export interface AnnualMonth {
+  month: number
+  sheet_name: string
+  people: number
+  total_salary: number
+  total_workdays: number
+  total_overtime: number
+}
+
+export interface Project {
+  id: number
+  name: string
+  created_at: string
 }

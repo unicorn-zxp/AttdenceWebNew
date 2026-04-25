@@ -1,11 +1,13 @@
 """Upload API routes."""
 
+import asyncio
 import os
 import shutil
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 
 from services.session_manager import session_manager
+from database import seed_from_ledger
 from config import ALLOWED_EXTENSIONS
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
@@ -50,7 +52,11 @@ async def upload_attendance(session_id: str = Query(...), files: list[UploadFile
 
 
 @router.post("/ledger")
-async def upload_ledger(session_id: str = Query(...), file: UploadFile = File(...)):
+async def upload_ledger(
+    session_id: str = Query(...),
+    project_id: int = Query(default=1),
+    file: UploadFile = File(...),
+):
     session = session_manager.get_session(session_id)
     if not session:
         raise HTTPException(404, "会话不存在")
@@ -60,7 +66,15 @@ async def upload_ledger(session_id: str = Query(...), file: UploadFile = File(..
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
     session.ledger_path = dest
-    return {"status": "ok", "filename": file.filename}
+    session.project_id = project_id
+
+    # Seed historical monthly data from existing ledger sheets
+    try:
+        count = await asyncio.to_thread(seed_from_ledger, project_id, dest)
+    except Exception:
+        count = 0
+
+    return {"status": "ok", "filename": file.filename, "seeded_months": count}
 
 
 @router.get("/status")
@@ -74,4 +88,5 @@ async def upload_status(session_id: str = Query(...)):
         "attendance": len(session.attendance_paths) > 0,
         "ledger": session.ledger_path is not None,
         "attendance_count": len(session.attendance_paths),
+        "project_id": getattr(session, "project_id", 1),
     }

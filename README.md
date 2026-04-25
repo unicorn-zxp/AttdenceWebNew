@@ -17,18 +17,20 @@
                     └──┬───────┬───┘
                静态文件  │       │ /api/*
                    ┌────▼───┐   │
-                   │ Vue 3  │   │
+                   │ Vue 3  │   │  项目选择器 + 数据看板/考勤计算双Tab
                    │ 前端SPA│   │
                    └────────┘   │
                            ┌────▼─────┐
-                           │ FastAPI  │  计算API
+                           │ FastAPI  │  计算API + 项目管理
                            │ :8000    │
-                           └────┬─────┘
-                                │ volume :ro
-                           ┌────▼─────┐
-                           │attendance│  核心计算模块(零修改)
-                           │_core.py  │
-                           └──────────┘
+                           └──┬───┬───┘
+                              │   │
+               ┌──────────────┘   └──────────────┐
+               │ volume :ro                       │
+          ┌────▼─────┐                     ┌──────▼──────┐
+          │attendance│  核心计算模块(零修改)  │  SQLite DB  │  按项目隔离持久化
+          │_core.py  │                     │  data/      │  (月度汇总+完整计算结果)
+          └──────────┘                     └─────────────┘
 
 独立服务:
                     ┌──────────────┐
@@ -64,40 +66,48 @@ Abay/
 │   ├── Dockerfile               # python:3.12-slim
 │   ├── requirements.txt         # fastapi, uvicorn, python-multipart, pandas, openpyxl, xlrd, numpy
 │   ├── .dockerignore
-│   ├── main.py                  # FastAPI 入口，CORS，生命周期
+│   ├── main.py                  # FastAPI 入口，CORS，生命周期，项目管理 + 年度汇总端点
 │   ├── config.py                # 端口/会话过期/上传限制等常量
+│   ├── database.py              # ★ SQLite 持久化：项目CRUD/月度汇总/完整计算结果/种子导入
 │   ├── routers/
-│   │   ├── upload.py            # 文件上传端点
-│   │   ├── calculate.py         # 触发核心计算
-│   │   ├── results.py           # 查询计算结果
+│   │   ├── upload.py            # 文件上传端点（台账上传时按项目 seed 历史月份）
+│   │   ├── calculate.py         # 触发核心计算（计算后写入 DB 月度汇总 + 完整结果）
+│   │   ├── results.py           # 查询计算结果 + 历史结果从 DB 加载
 │   │   └── download.py          # 下载 Excel 文件
 │   ├── services/
-│   │   └── session_manager.py   # 内存会话管理，UUID，自动过期清理
-│   └── schemas/
-│       └── models.py            # Pydantic 响应模型
+│   │   └── session_manager.py   # 内存会话管理，UUID，自动过期清理，绑定 project_id
+│   ├── schemas/
+│   │   └── models.py            # Pydantic 响应模型
+│   └── data/                    # ★ SQLite 数据库文件目录（运行时生成）
+│       └── attendance.db
 │
 ├── frontend/                    # Vue 3 前端
 │   ├── package.json
 │   ├── vite.config.ts           # @ 别名 + dev proxy /api → :8000
 │   ├── index.html
 │   └── src/
-│       ├── main.ts              # 入口：注册 ElementPlus + Pinia
-│       ├── App.vue              # 主布局：左侧 sidebar + 右侧内容区
+│       ├── main.ts              # 入口：注册 ElementPlus + Pinia + 导入全局样式
+│       ├── App.vue              # 主布局：顶部栏(项目选择+双Tab) + 可折叠深色侧边栏 + 内容区
 │       ├── api/
-│       │   └── client.ts        # Axios 实例，自动附加 session_id
+│       │   └── client.ts        # Axios 实例，自动附加 session_id + project_id
+│       ├── styles/
+│       │   ├── variables.css    # ★ CSS 设计令牌（配色/间距/阴影/圆角/过渡/布局尺寸）
+│       │   └── global.css       # ★ 全局样式（字体/动画/Element Plus 微调/响应式断点）
 │       ├── stores/
-│       │   └── attendance.ts    # Pinia 状态管理（全生命周期）
+│       │   └── attendance.ts    # Pinia 状态管理（项目CRUD/全生命周期/年度汇总按项目拉取）
 │       ├── types/
-│       │   └── index.ts         # TypeScript 接口定义
+│       │   └── index.ts         # TypeScript 接口定义（含 AnnualMonth, Project）
 │       └── components/
-│           ├── FileUploadPanel.vue   # 3个上传按钮
-│           ├── ConfigPanel.vue       # 晚班容差滑块
-│           ├── AlertBanner.vue       # 异常人员告警
-│           ├── OverviewCards.vue     # 4个统计卡片
-│           ├── JobCharts.vue         # ECharts 工种饼图+柱状图
-│           ├── SalaryTable.vue       # 工资汇总表（搜索/排序/高亮）
-│           ├── DailyAttendance.vue   # 每日考勤明细（3个Tab）
-│           └── DownloadPanel.vue     # 3个下载按钮
+│           ├── DashboardView.vue     # ★ 数据看板：年度工资总览（KPI+柱状图+月度表）
+│           ├── FileUploadPanel.vue   # 3个上传项（步骤编号圆圈 + 深色适配）
+│           ├── ConfigPanel.vue       # 晚班容差滑块（深色适配 + 放大数值显示）
+│           ├── AlertBanner.vue       # 异常告警（左边框彩色卡片 + 折叠展开）
+│           ├── OverviewCards.vue     # 4色 KPI 统计卡片
+│           ├── JobCharts.vue         # 水平柱状图（工种人数 + 工种工资）
+│           ├── SalaryTable.vue       # 工资汇总表（搜索/排序/分页/高亮）
+│           ├── DailyAttendance.vue   # 每日考勤明细（Tab+Badge/搜索/分页/共享列定义）
+│           ├── DownloadPanel.vue     # 3个下载卡片
+│           └── YearSummaryChart.vue  # (保留) 年度工资汇总组件
 │
 └── nginx/                       # Nginx 反向代理
     ├── Dockerfile               # 多阶段：node构建前端 + nginx服务
@@ -124,6 +134,7 @@ Abay/
 yt-worker:  ./attendance → /app                        # Streamlit 代码
 backend:    ./backend    → /app                        # API 代码（热更新）
             ./attendance → /app/attendance:ro           # 核心模块只读挂载
+            # SQLite DB 文件位于 backend/data/，随代码目录自动持久化
 nginx:      无（构建时内嵌前端静态文件）
 ```
 
@@ -295,14 +306,39 @@ DEFAULT_OVERTIME_CUTOVER = time(16, 30)  # 加班分界时间
 
 Base URL: `http://localhost:8000`（开发）或 `http://localhost:8080/api`（通过 Nginx）
 
-所有端点（除 `/api/session` 和 `/api/health`）需携带 `?session_id=xxx` 查询参数。
+### 公共端点（无需 session）
+
+```
+GET    /api/health                                      → 健康检查
+GET    /api/annual-summary?project_id=1&year=2026       → 年度月度工资汇总（按项目隔离）
+```
+
+**GET /api/annual-summary**
+
+从 SQLite 数据库读取指定项目、指定年度的所有月度汇总数据，无需会话。
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `project_id` | 1 | 项目 ID |
+| `year` | 2026 | 年度 |
+
+Response:
+```json
+{
+  "year": 2026,
+  "project_id": 1,
+  "months": [
+    { "month": 2, "sheet_name": "2月11日-3月10日工资表", "people": 45, "total_salary": 125000.00, "total_workdays": 900, "total_overtime": 120.5 },
+    { "month": 3, "sheet_name": "3月11日-4月10日工资表", "people": 48, "total_salary": 132000.00, "total_workdays": 960, "total_overtime": 135.0 }
+  ]
+}
+```
 
 ### 会话管理
 
 ```
 POST   /api/session                        → 创建会话
 DELETE /api/session/{session_id}            → 删除会话（重置）
-GET    /api/health                          → 健康检查
 PUT    /api/config?session_id=&late_tolerance=  → 更新容差配置
 ```
 
@@ -313,13 +349,43 @@ Response:
 {"session_id": "a1b2c3d4e5f6..."}
 ```
 
+### 项目管理
+
+```
+GET    /api/projects                       → 列出所有项目
+POST   /api/projects?name=xxx              → 新建项目
+DELETE /api/projects/{project_id}          → 删除项目及所有关联数据
+```
+
+**GET /api/projects**
+
+Response:
+```json
+{
+  "projects": [
+    { "id": 1, "name": "默认项目", "created_at": "2026-04-25 09:00:00" },
+    { "id": 2, "name": "西安北站", "created_at": "2026-04-25 09:05:00" }
+  ]
+}
+```
+
+**POST /api/projects**
+
+参数：`name`（项目名称，必填）
+
+Response: 新创建的项目对象
+
+**DELETE /api/projects/{project_id}**
+
+级联删除该项目的所有 monthly_summary 和 calculation_result 记录。
+
 ### 文件上传
 
 ```
-POST   /api/upload/roster?session_id=       → 上传花名册（单个 .xlsx）
-POST   /api/upload/attendance?session_id=   → 上传考勤（多个 .xls/.xlsx）
-POST   /api/upload/ledger?session_id=       → 上传台账（单个 .xlsx）
-GET    /api/upload/status?session_id=       → 查询上传状态
+POST   /api/upload/roster?session_id=              → 上传花名册（单个 .xlsx）
+POST   /api/upload/attendance?session_id=          → 上传考勤（多个 .xls/.xlsx）
+POST   /api/upload/ledger?session_id=&project_id=  → 上传台账（单个 .xlsx）★ 按项目种子历史月份
+GET    /api/upload/status?session_id=              → 查询上传状态（含 project_id）
 ```
 
 **POST /api/upload/roster**
@@ -336,9 +402,16 @@ Response: `{"status": "ok", "count": 3}`
 
 **POST /api/upload/ledger**
 
+上传台账时，后端自动读取原始 Excel 中所有 `*工资表` sheet，提取人数/工资总额/出勤工日/加班工时等数据写入 SQLite 数据库（种子操作，按 `project_id` 隔离）。
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `session_id` | 必填 | 会话ID |
+| `project_id` | 1 | 绑定到的项目ID |
+
 Request: `multipart/form-data`，字段名 `file`
 
-Response: `{"status": "ok", "filename": "工资台账.xlsx"}`
+Response: `{"status": "ok", "filename": "工资台账.xlsx", "seeded_months": 2}`
 
 **GET /api/upload/status**
 
@@ -348,7 +421,8 @@ Response:
   "roster": true,
   "attendance": true,
   "ledger": false,
-  "attendance_count": 2
+  "attendance_count": 2,
+  "project_id": 1
 }
 ```
 
@@ -371,6 +445,8 @@ POST /api/calculate
   → generate_ledger_sheet(ledger_path, ..., salary_df, ...)
   → generate_report_format(daily_df, roster_path, ...)
   → 将 DataFrame 转为 JSON-safe dict 存入会话
+  → ★ upsert_month() 将当月汇总写入 SQLite（按 project_id 隔离）
+  → ★ save_calculation() 将完整工资+考勤 JSON 永久保存到 SQLite
 ```
 
 Response:
@@ -392,8 +468,10 @@ Error: `400` 文件未上传/日期范围读取失败，`500` 计算异常
 ### 结果查询
 
 ```
-GET    /api/results/salary?session_id=      → 工资汇总 JSON
-GET    /api/results/daily?session_id=       → 每日明细 JSON
+GET    /api/results/salary?session_id=              → 工资汇总 JSON（从会话内存）
+GET    /api/results/daily?session_id=               → 每日明细 JSON（从会话内存）
+GET    /api/results/history?project_id=&year=&month= → ★ 从 DB 加载历史计算结果
+GET    /api/results/history-list?project_id=         → ★ 列出某项目所有历史计算
 ```
 
 **GET /api/results/salary**
@@ -432,24 +510,95 @@ Response: 二进制 Excel 文件，`Content-Type: application/vnd.openxmlformats
 
 ---
 
+## SQLite 持久化存储
+
+`backend/database.py` 使用 SQLite 存储项目、月度工资汇总和完整计算结果，数据库文件位于 `backend/data/attendance.db`。所有数据按 `project_id` 隔离，支持多工地独立使用。
+
+### 表结构
+
+```sql
+-- 项目表
+CREATE TABLE project (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 月度工资汇总（按项目隔离）
+CREATE TABLE monthly_summary (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id   INTEGER NOT NULL,
+    year         INTEGER NOT NULL,
+    month        INTEGER NOT NULL,
+    sheet_name   TEXT    NOT NULL DEFAULT '',
+    people       INTEGER NOT NULL DEFAULT 0,
+    total_salary REAL    NOT NULL DEFAULT 0,
+    total_workdays INTEGER NOT NULL DEFAULT 0,
+    total_overtime  REAL NOT NULL DEFAULT 0,
+    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES project(id),
+    UNIQUE(project_id, year, month)   -- 每个项目同年同月只保留最新一条
+);
+
+-- 完整计算结果（工资+考勤JSON永久保存）
+CREATE TABLE calculation_result (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id        INTEGER NOT NULL,
+    year              INTEGER NOT NULL,
+    month             INTEGER NOT NULL,
+    sheet_name        TEXT    NOT NULL DEFAULT '',
+    salary_json       TEXT    NOT NULL DEFAULT '[]',   -- 工资汇总完整记录 JSON
+    daily_json        TEXT    NOT NULL DEFAULT '[]',   -- 每日考勤完整记录 JSON
+    overview_json     TEXT    NOT NULL DEFAULT '{}',   -- 概览统计 JSON
+    abnormal_count    INTEGER NOT NULL DEFAULT 0,
+    output_att_summary TEXT,                           -- 考勤汇总输出路径
+    output_ledger     TEXT,                             -- 台账输出路径
+    output_report     TEXT,                             -- 上报表输出路径
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (project_id) REFERENCES project(id),
+    UNIQUE(project_id, year, month)
+);
+```
+
+### 数据写入时机
+
+| 时机 | 触发方式 | 写入内容 |
+|------|---------|---------|
+| 上传台账 | `POST /api/upload/ledger` | 按项目自动读取台账中所有 `*工资表` sheet，提取并入库 monthly_summary |
+| 计算完成 | `POST /api/calculate` | 写入 monthly_summary（当月汇总）+ calculation_result（完整 JSON） |
+
+### 数据读取方式
+
+| 场景 | 端点 | 说明 |
+|------|------|------|
+| 页面加载 | `GET /api/annual-summary?project_id=&year=` | 无需 session，按项目返回年度汇总 |
+| 历史回看 | `GET /api/results/history?project_id=&year=&month=` | 从 DB 加载完整工资/考勤 JSON |
+| 项目列表 | `GET /api/results/history-list?project_id=` | 列出某项目所有历史计算 |
+
+---
+
 ## 会话管理机制
 
 `services/session_manager.py` 实现基于内存的 UUID 会话。
 
 - 每个会话有独立 `tempfile.mkdtemp()` 临时目录，存放上传文件和输出文件
+- 每个会话绑定一个 `project_id`（默认为 1），上传台账时自动关联
 - 2小时自动过期（`SESSION_EXPIRE_HOURS=2`）
 - 后台 asyncio 任务每小时清理过期会话
-- 无 Redis/数据库（单用户内部工具）
+- **月度汇总和完整计算结果存储在 SQLite 中，独立于会话生命周期**
+- **历史计算结果可通过 `/api/results/history` 从 DB 加载，不依赖会话存活**
 
 ### 会话生命周期
 
 ```
-前端创建会话 → localStorage 存储 session_id
-  → 上传3个文件到会话临时目录
-  → POST /calculate 触发计算
+前端创建会话 → localStorage 存储 session_id + project_id
+  → 上传3个文件到会话临时目录（台账上传时按项目 seed 历史月份到 SQLite）
+  → POST /calculate 触发计算（计算结果写入 SQLite monthly_summary + calculation_result）
   → GET /results/* 查询结果
   → GET /download/* 下载 Excel
   → DELETE /session 或 2小时后自动过期清理
+  → SQLite 中的数据不受影响，下次页面加载仍然可见
+  → 历史结果可通过 /api/results/history 永久回看
 ```
 
 ---
@@ -460,14 +609,33 @@ Response: 二进制 Excel 文件，`Content-Type: application/vnd.openxmlformats
 
 Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
 
+### 设计系统
+
+`src/styles/variables.css` 定义全局 CSS 设计令牌：
+
+| 类别 | 内容 |
+|------|------|
+| 配色 | 品牌色 Indigo `#4F46E5`，深色侧边栏 `#1E293B`，浅色内容区 `#F8FAFC` |
+| KPI 卡片色 | 4 种独立配色：indigo / emerald / orange / red |
+| 阴影 | xs / sm / md / lg 四级 |
+| 间距 | 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48 px |
+| 字体 | 12-30px 层级 |
+| 圆角 | 4 / 8 / 12 / 16px |
+| 过渡 | 150ms / 250ms / 350ms |
+| 布局 | 侧边栏 280px / 顶部栏 56px / 内容区 max-width 1400px |
+| Element Plus | 覆盖 `--el-color-primary`、`--el-border-color` 等 |
+
 ### 状态管理 (Pinia store)
 
 `stores/attendance.ts` 管理全部状态：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
+| `projects` | `Project[]` | 所有项目列表 |
+| `activeProjectId` | `number` | 当前选中项目ID（默认1） |
+| `activeProject` | `Project` | 当前项目对象（computed） |
 | `sessionId` | `string` | 当前会话ID |
-| `uploadStatus` | `UploadStatus` | 三个文件的上传状态 |
+| `uploadStatus` | `UploadStatus` | 三个文件的上传状态（含 project_id） |
 | `calculating` | `boolean` | 计算中标记 |
 | `calculated` | `boolean` | 已完成计算 |
 | `overview` | `OverviewStats` | 概览统计 |
@@ -477,40 +645,101 @@ Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
 | `abnormalCount` | `number` | 异常人数 |
 | `lateTolerance` | `number` | 晚班容差配置 |
 | `error` | `string` | 错误信息 |
+| `annualData` | `AnnualMonth[]` | ★ 年度月度汇总（按项目从 SQLite 读取） |
 
 ### API 客户端
 
 `api/client.ts` 封装 Axios：
 
 - `baseURL: '/api'`
-- 请求拦截器：从 `localStorage` 读取 `session_id` 附加到查询参数
+- 请求拦截器：从 `localStorage` 读取 `session_id` 和 `project_id` 附加到查询参数
 - 响应拦截器：提取 `response.data.detail` 作为错误信息
 - 超时 120秒（计算可能耗时）
 
+年度汇总接口使用 `axios` 直接调用 `/api/annual-summary?project_id=X&year=2026`（无需 session），在 `fetchAnnual()` 中按项目独立拉取。
+
 ### 组件说明
 
-| 组件 | Element Plus 组件 | 功能 |
-|------|-------------------|------|
-| `App.vue` | `el-container` | 主布局：320px侧边栏 + 弹性内容区 |
-| `FileUploadPanel` | 3×`el-upload` | 花名册/考勤/台账上传，上传后按钮变绿并提示"点击重选"可覆盖重传 |
-| `ConfigPanel` | `el-slider` | 晚班容差配置（1-15分钟） |
-| `AlertBanner` | `el-alert` + `el-table` | 异常人员列表（可展开表格） |
-| `OverviewCards` | 4×`el-card` + `el-statistic` | 结算人数/工资总额/出勤工日/加班工时 |
-| `JobCharts` | `vue-echarts` | 环形饼图（工种人数）+ 水平柱状图（工种工资） |
-| `SalaryTable` | `el-table` | 搜索/排序/金额格式化/异常行黄色高亮 |
-| `DailyAttendance` | `el-tabs` + `el-table` | 3个Tab：全部/搜索/异常 |
-| `DownloadPanel` | 3×`el-button` | 下载3个Excel文件 |
+| 组件 | 功能 |
+|------|------|
+| `App.vue` | 主布局：顶部栏(项目选择器+数据看板/考勤计算双Tab) + 可折叠深色侧边栏 280px + 可滚动内容区 |
+| `DashboardView` | ★ 数据看板 Tab：年度工资总览（4色KPI卡片 + 柱状图 + 月度明细表），按项目加载 |
+| `FileUploadPanel` | 3 个上传项，深色适配，步骤编号圆圈（完成变绿勾），等宽排列 |
+| `ConfigPanel` | 晚班容差滑块，深色适配，容差值放大显示，规则放入半透明圆角卡片 |
+| `AlertBanner` | 左边框彩色卡片（warning=amber / success=emerald），点击折叠展开异常表格 |
+| `OverviewCards` | 4 色 KPI 卡片（indigo/emerald/orange/red），彩色图标圆圈 + 大号数值，hover 上移效果 |
+| `YearSummaryChart` | ★ 年度工资汇总：4 张大号累计 KPI 卡片 + 柱状图 + 月度明细表，数据从 SQLite 加载 |
+| `JobCharts` | 2 列水平柱状图（工种人数分布 + 工种工资总额），品牌色渐变填充 |
+| `SalaryTable` | 工资汇总表，表头 flex 两端对齐（标题+人数标签+搜索框），工资总额品牌色强调，前端分页（20/50/100条） |
+| `DailyAttendance` | 3 个 Tab（全部/异常）带 Badge 数量，搜索框内嵌，共享列定义 v-for 渲染，前端分页 |
+| `DownloadPanel` | 3 个独立下载卡片（图标+标题+描述+按钮），Sheet 信息绿色 Tag |
 
 ### 用户操作流程
 
 ```
-1. 页面加载 → 自动创建会话（或恢复 localStorage 中的 session_id）
-2. 侧边栏上传3个文件（按钮逐一变绿，提示"点击重选"可覆盖重传）
-3. 调整容差配置（可选）
-4. 点击"开始计算" → loading 状态
-5. 计算完成 → 展示：异常告警 → 概览卡片 → 图表 → 工资表 → 考勤明细 → 下载按钮
-6. 点击"重置" → 清除会话，回到上传界面
+1. 页面加载 → 自动拉取项目列表 → 恢复上次选中项目（localStorage）
+            → 按项目从 SQLite 拉取年度汇总
+            → 同时创建会话（或恢复 localStorage 中的 session_id）
+2. 顶部栏显示当前项目（下拉切换 / 新建 / 删除）
+3. 两个 Tab 切换：
+   a. 「数据看板」Tab — 全宽年度工资总览（KPI + 柱状图 + 月度表），侧边栏隐藏
+   b. 「考勤计算」Tab — 侧边栏 + 计算流程
+4. 切换项目 → 重置会话 → 重新拉取该项目年度数据
+5. 侧边栏上传 3 个文件（按钮逐一变绿，台账上传时按项目 seed 历史月份到 DB）
+6. 调整容差配置（可选）
+7. 点击"开始计算" → loading 状态
+8. 计算完成 → 自动切换到「考勤计算」Tab → fade 过渡到结果页面：
+   异常告警 → 当月 KPI 卡片 → 工种图表 → 工资表 → 考勤明细 → 下载卡片
+9. 点击"重置" → 清除会话，回到上传界面（SQLite 数据保留）
 注：上传完毕后即可点击"重置"，无需等到计算完成
+```
+
+### 页面布局
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │ ≡  [数据看板] [考勤计算]   🏢 默认项目 ▼   [计算完成] 🗑││ ← 顶部栏 56px
+│  │    └─ Tab 切换 ──┘        └─ 项目选择器 ──┘              ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  ──「数据看板」Tab（无侧边栏，全宽）──                       │
+│  ┌──────────────────────────────────────────────────────────┐│
+│  │  2026 年度工资总览 — 创新智成 · 西安东站项目             ││
+│  │  ┌──────────┬──────────┬──────────┬──────────┐          ││
+│  │  │ 累计工资  │ 人数峰值  │ 累计工日  │ 累计加班  │          ││ ← 4 色 KPI
+│  │  │ ¥12.50万 │ 48人     │ 1860工日  │ 255.5h   │          ││
+│  │  └──────────┴──────────┴──────────┴──────────┘          ││
+│  │  ┌────────────────────────────────────────────┐          ││
+│  │  │  月度工资趋势（柱状图）                      │          ││
+│  │  └────────────────────────────────────────────┘          ││
+│  │  ┌────────────────────────────────────────────┐          ││
+│  │  │  月度明细表（月份/工资表/人数/工资/工日/加班）│          ││
+│  │  └────────────────────────────────────────────┘          ││
+│  └──────────────────────────────────────────────────────────┘│
+│                                                              │
+│  ──「考勤计算」Tab（侧边栏 + 内容区）──                      │
+│  ┌──────────┐  ┌──────────────────────────────────────────┐│
+│  │ 品牌 Logo │  │                                          ││
+│  │──────────│  │  流程指引卡片 / 计算结果                   ││
+│  │ ┌──────┐ │  │  ┌──────────────────────────────┐        ││
+│  │ │数据  │ │  │  │  1 花名册 ✓ → 2 考勤 ✓ → 3 台账  │        ││
+│  │ │上传  │ │  │  └──────────────────────────────┘        ││
+│  │ └──────┘ │  │                                          ││
+│  │ ┌──────┐ │  │  计算规则说明 (折叠面板)                  ││
+│  │ │计算  │ │  │                                          ││
+│  │ │配置  │ │  │  ── 计算后 fade 过渡到结果页 ──           ││
+│  │ └──────┘ │  │  异常告警 → KPI卡片 → 工种图表 →          ││
+│  │ ┌──────┐ │  │  工资表 → 考勤明细 → 下载卡片             ││
+│  │ │开始  │ │  │                                          ││
+│  │ │计算  │ │  │                                          ││
+│  │ │重置  │ │  │                                          ││
+│  │ └──────┘ │  │                                          ││
+│  │  深色    │  │                                          ││
+│  │  侧边栏  │  │                                          ││
+│  │  280px  │  │                                          ││
+│  └──────────┘  └──────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -570,7 +799,7 @@ docker compose --profile web --profile old up -d
 |------|------|
 | `创新智成-西安东站-花名册-2026.4.xlsx` | 花名册，含245人 |
 | `员工刷卡记录表4-1.xls` + `4-2.xls` | 考勤记录，共6543条 |
-| `工资台账2026（超）.xlsx` | 工资台账模板 |
+| `工资台账2026（超）.xlsx` | 工资台账模板（含2月、3月已有工资表） |
 
 E2E 测试结果：176条工资记录，工资总额 ¥1,180,417.48。
 
@@ -582,9 +811,15 @@ E2E 测试结果：176条工资记录，工资总额 ¥1,180,417.48。
 |------|------|
 | `attendance_core.py` 零修改 | 核心计算逻辑单一数据源，前端可替换 |
 | 内存会话（无 Redis） | 单用户内部工具，无需额外中间件 |
-| 无数据库 | 输入输出均为 Excel，无需持久化 |
+| SQLite 持久化 + 项目隔离 | 跨会话保留数据，多工地互不冲突，零运维开销 |
+| `project_id` 维度隔离 | 不同工地上传不同台账不会互相覆盖，数据完全独立 |
+| 完整计算结果落库 | salary/daily JSON 永久保存，历史结果可随时回看 |
+| 年度汇总读原始台账文件 | 避免 openpyxl 保存后丢失公式缓存值的问题 |
 | `asyncio.to_thread()` | `attendance_core.py` 是同步 pandas 代码 |
+| SQLite WAL + busy_timeout | 2-3 个偶发用户并发写入，无需引入 PostgreSQL |
+| 顶部栏 Tab 导航 | 数据看板（全局）与考勤计算（工具）两个场景清晰分离 |
 | ECharts 替代 Plotly | 中文支持好，与 Element Plus 风格统一 |
-| 全量数据下发（无分页） | 典型 <200 人、<5000 条记录，前端过滤即可 |
-| 单页应用（无 vue-router） | 线性工作流：上传→计算→结果 |
+| 前端分页（20/50/100条） | 避免大量数据时表格过长，搜索时自动重置页码 |
+| 单页应用（无 vue-router） | 线性工作流：选择项目→上传→计算→结果 |
 | Volume 挂载 attendance_core.py | 避免代码重复，保持单一数据源 |
+| CSS 设计令牌 (variables.css) | 统一配色/间距/阴影/圆角，全局一致且易于主题切换 |

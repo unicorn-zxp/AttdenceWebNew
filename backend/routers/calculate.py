@@ -7,6 +7,7 @@ import sys
 from fastapi import APIRouter, Query, HTTPException
 
 from services.session_manager import session_manager
+from database import upsert_month, save_calculation
 from config import ATTENDANCE_CORE_DIR
 
 router = APIRouter(prefix="/api", tags=["calculate"])
@@ -30,6 +31,7 @@ def _run_calculation(session):
     )
 
     output_dir = session.temp_dir
+    project_id = getattr(session, "project_id", 1)
 
     # 1. Parse roster
     roster_dict = parse_xdz_roster(session.roster_path)
@@ -103,6 +105,9 @@ def _run_calculation(session):
             result.append(record)
         return result
 
+    salary_records = _df_to_records(salary_df)
+    daily_records = _df_to_records(daily_df)
+
     # Overview stats
     overview = {
         "total_people": len(salary_df),
@@ -114,14 +119,46 @@ def _run_calculation(session):
     abnormal_count = len(salary_df[salary_df["备注"] != ""])
 
     # Store in session
-    session.salary_records = _df_to_records(salary_df)
-    session.daily_records = _df_to_records(daily_df)
+    session.salary_records = salary_records
+    session.daily_records = daily_records
     session.overview = overview
     session.sheet_name = sheet_name
     session.abnormal_count = abnormal_count
     session.att_summary_path = att_summary_path
     session.ledger_output_path = ledger_output_path
     session.report_path = report_path
+
+    # Persist to SQLite
+    sy, sm, _ = start_date
+
+    # 1) Monthly summary
+    upsert_month(
+        project_id=project_id,
+        year=sy,
+        month=sm,
+        sheet_name=sheet_name,
+        people=overview["total_people"],
+        total_salary=overview["total_salary"],
+        total_workdays=overview["total_workdays"],
+        total_overtime=overview["total_overtime"],
+    )
+
+    # 2) Full calculation results (salary + daily JSON)
+    save_calculation(
+        project_id=project_id,
+        year=sy,
+        month=sm,
+        sheet_name=sheet_name,
+        salary_records=salary_records,
+        daily_records=daily_records,
+        overview=overview,
+        abnormal_count=abnormal_count,
+        output_paths={
+            "att_summary": att_summary_path,
+            "ledger": ledger_output_path,
+            "report": report_path,
+        },
+    )
 
     return {
         "overview": overview,

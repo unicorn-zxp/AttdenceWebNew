@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <h3 style="margin: 0 0 12px 0; font-size: 15px;">
+  <div class="upload-panel">
+    <h3 class="panel-title">
       <el-icon><FolderOpened /></el-icon> 数据上传
     </h3>
 
@@ -11,14 +11,19 @@
       accept=".xlsx"
       :http-request="(opts: any) => store.uploadRoster(opts.file)"
       :disabled="store.calculated"
+      class="upload-wrapper"
     >
-      <el-button
-        :type="store.uploadStatus.roster ? 'success' : 'default'"
-        style="width: 100%;"
-      >
-        <el-icon><Document /></el-icon>
-        {{ store.uploadStatus.roster ? '花名册已上传（点击重选）' : '上传花名册 (.xlsx)' }}
-      </el-button>
+      <div class="upload-item" :class="{ done: store.uploadStatus.roster }">
+        <div class="upload-step" :class="{ done: store.uploadStatus.roster }">
+          <el-icon v-if="store.uploadStatus.roster"><Check /></el-icon>
+          <span v-else>1</span>
+        </div>
+        <div class="upload-info">
+          <span class="upload-label">{{ store.uploadStatus.roster ? '花名册已上传' : '上传花名册' }}</span>
+          <span class="upload-hint">.xlsx</span>
+        </div>
+        <el-icon v-if="store.uploadStatus.roster" class="upload-done-icon"><CircleCheckFilled /></el-icon>
+      </div>
     </el-upload>
 
     <!-- Attendance -->
@@ -29,17 +34,23 @@
       multiple
       :on-change="onAttendanceChange"
       :disabled="store.calculated"
-      style="margin-top: 10px; display: block;"
+      class="upload-wrapper"
     >
-      <el-button
-        :type="store.uploadStatus.attendance ? 'success' : 'default'"
-        style="width: 100%;"
-      >
-        <el-icon><Calendar /></el-icon>
-        {{ store.uploadStatus.attendance
-          ? `考勤已上传 ${store.uploadStatus.attendance_count} 个文件（点击重选）`
-          : '上传考勤记录 (.xls/.xlsx，可多选)' }}
-      </el-button>
+      <div class="upload-item" :class="{ done: store.uploadStatus.attendance }">
+        <div class="upload-step" :class="{ done: store.uploadStatus.attendance }">
+          <el-icon v-if="store.uploadStatus.attendance"><Check /></el-icon>
+          <span v-else>2</span>
+        </div>
+        <div class="upload-info">
+          <span class="upload-label">
+            {{ store.uploadStatus.attendance
+              ? `考勤已上传`
+              : '上传考勤记录' }}
+          </span>
+          <span class="upload-hint">{{ store.uploadStatus.attendance ? `${store.uploadStatus.attendance_count} 个文件` : '.xls/.xlsx 多选' }}</span>
+        </div>
+        <el-icon v-if="store.uploadStatus.attendance" class="upload-done-icon"><CircleCheckFilled /></el-icon>
+      </div>
     </el-upload>
 
     <!-- Ledger -->
@@ -49,15 +60,19 @@
       accept=".xlsx"
       :http-request="(opts: any) => store.uploadLedger(opts.file)"
       :disabled="store.calculated"
-      style="margin-top: 10px; display: block;"
+      class="upload-wrapper"
     >
-      <el-button
-        :type="store.uploadStatus.ledger ? 'success' : 'default'"
-        style="width: 100%;"
-      >
-        <el-icon><Notebook /></el-icon>
-        {{ store.uploadStatus.ledger ? '台账已上传（点击重选）' : '上传工资台账 (.xlsx)' }}
-      </el-button>
+      <div class="upload-item" :class="{ done: store.uploadStatus.ledger }">
+        <div class="upload-step" :class="{ done: store.uploadStatus.ledger }">
+          <el-icon v-if="store.uploadStatus.ledger"><Check /></el-icon>
+          <span v-else>3</span>
+        </div>
+        <div class="upload-info">
+          <span class="upload-label">{{ store.uploadStatus.ledger ? '台账已上传' : '上传工资台账' }}</span>
+          <span class="upload-hint">.xlsx</span>
+        </div>
+        <el-icon v-if="store.uploadStatus.ledger" class="upload-done-icon"><CircleCheckFilled /></el-icon>
+      </div>
     </el-upload>
   </div>
 </template>
@@ -74,3 +89,97 @@ function onAttendanceChange(_file: any, fileList: any[]) {
   }
 }
 </script>
+
+<style scoped>
+.panel-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-inverse-secondary);
+  margin: 0 0 var(--space-3) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* Force el-upload to be full-width block */
+.upload-wrapper {
+  display: block !important;
+  width: 100%;
+}
+.upload-wrapper :deep(.el-upload) {
+  display: block;
+  width: 100%;
+}
+
+.upload-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: var(--space-2);
+  width: 100%;
+  box-sizing: border-box;
+}
+.upload-item:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.18);
+}
+.upload-item.done {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.upload-step {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-inverse-secondary);
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+.upload-step.done {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: white;
+}
+
+.upload-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.upload-label {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-inverse);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.upload-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-inverse-secondary);
+  margin-top: 1px;
+}
+
+.upload-done-icon {
+  color: var(--color-success);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+</style>

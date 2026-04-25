@@ -1,0 +1,112 @@
+/* ============================================
+   Design Tokens — CSS Custom Properties
+   ============================================ */
+
+:root {
+  /* --- Brand --- */
+  --color-brand: #4F46E5;
+  --color-brand-light: #6366F1;
+  --color-brand-lighter: #818CF8;
+  --color-brand-dark: #4338CA;
+  --color-brand-bg: rgba(79, 70, 229, 0.08);
+
+  /* --- Surfaces --- */
+  --color-sidebar: #1E293B;
+  --color-sidebar-hover: #334155;
+  --color-sidebar-active: #475569;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FFFFFF;
+
+  /* --- Text --- */
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94A3B8;
+  --color-text-inverse: #F8FAFC;
+  --color-text-inverse-secondary: #CBD5E1;
+
+  /* --- Borders --- */
+  --color-border: #E2E8F0;
+  --color-border-light: #F1F5F9;
+
+  /* --- Semantic --- */
+  --color-success: #10B981;
+  --color-success-light: rgba(16, 185, 129, 0.1);
+  --color-warning: #F59E0B;
+  --color-warning-light: rgba(245, 158, 11, 0.1);
+  --color-danger: #EF4444;
+  --color-danger-light: rgba(239, 68, 68, 0.1);
+  --color-info: #3B82F6;
+  --color-info-light: rgba(59, 130, 246, 0.1);
+
+  /* --- KPI Card Colors --- */
+  --kpi-indigo: #4F46E5;
+  --kpi-indigo-bg: rgba(79, 70, 229, 0.1);
+  --kpi-emerald: #10B981;
+  --kpi-emerald-bg: rgba(16, 185, 129, 0.1);
+  --kpi-orange: #F97316;
+  --kpi-orange-bg: rgba(249, 115, 22, 0.1);
+  --kpi-red: #EF4444;
+  --kpi-red-bg: rgba(239, 68, 68, 0.1);
+
+  /* --- Shadows --- */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+
+  /* --- Spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* --- Typography --- */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+
+  /* --- Border Radius --- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* --- Transitions --- */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 350ms ease;
+
+  /* --- Layout --- */
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 0px;
+  --header-height: 56px;
+  --content-max-width: 1400px;
+
+  /* --- Element Plus Overrides --- */
+  --el-color-primary: var(--color-brand);
+  --el-color-primary-light-3: var(--color-brand-lighter);
+  --el-color-primary-light-5: #A5B4FC;
+  --el-color-primary-light-7: #C7D2FE;
+  --el-color-primary-light-9: #EEF2FF;
+  --el-color-primary-dark-2: var(--color-brand-dark);
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border-light);
+  --el-border-radius-base: var(--radius-sm);
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-bg);
+  --el-text-color-primary: var(--color-text-primary);
+  --el-text-color-regular: var(--color-text-secondary);
+  --el-text-color-secondary: var(--color-text-tertiary);
+  --el-font-size-base: var(--text-base);
+}

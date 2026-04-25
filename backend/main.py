@@ -6,6 +6,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from services.session_manager import session_manager
+from database import init_db, get_annual, list_projects, create_project, delete_project
 from config import HOST, PORT
 
 # Import routers
@@ -17,7 +18,8 @@ from routers.download import router as download_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: start session cleanup task
+    # Startup: init database + start session cleanup
+    init_db()
     session_manager.start_cleanup()
     yield
     # Shutdown: cleanup all sessions
@@ -47,7 +49,8 @@ app.include_router(results_router)
 app.include_router(download_router)
 
 
-# Session endpoints
+# ─── Session endpoints ─────────────────────────────────────
+
 @app.post("/api/session")
 async def create_session():
     data = session_manager.create_session()
@@ -73,6 +76,40 @@ async def update_config(session_id: str = Query(...), late_tolerance: int = 10):
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+# ─── Project endpoints ─────────────────────────────────────
+
+@app.get("/api/projects")
+async def api_list_projects():
+    """List all projects."""
+    return {"projects": list_projects()}
+
+
+@app.post("/api/projects")
+async def api_create_project(name: str = Query(..., min_length=1)):
+    """Create a new project."""
+    return create_project(name)
+
+
+@app.delete("/api/projects/{project_id}")
+async def api_delete_project(project_id: int):
+    """Delete a project and all its data."""
+    if not delete_project(project_id):
+        raise HTTPException(404, "项目不存在")
+    return {"status": "ok"}
+
+
+# ─── Annual summary (project-scoped) ───────────────────────
+
+@app.get("/api/annual-summary")
+async def annual_summary(
+    project_id: int = Query(default=1),
+    year: int = Query(default=2026),
+):
+    """Public endpoint — no session required. Returns monthly summaries from DB."""
+    months = get_annual(project_id, year)
+    return {"year": year, "project_id": project_id, "months": months}
 
 
 if __name__ == "__main__":

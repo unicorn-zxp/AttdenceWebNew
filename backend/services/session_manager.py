@@ -26,6 +26,7 @@ class SessionData:
 
         # Config
         self.late_tolerance: int = 10
+        self.project_id: int = 1
 
         # Results
         self.salary_records: Optional[list[dict]] = None

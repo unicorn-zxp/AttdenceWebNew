@@ -1,35 +1,32 @@
 <template>
-  <el-row :gutter="16" style="margin-bottom: 20px;">
-    <el-col :span="12">
-      <el-card shadow="hover">
-        <template #header><strong>工种人数分布</strong></template>
-        <v-chart :option="pieOption" autoresize style="height: 320px;" />
-      </el-card>
-    </el-col>
-    <el-col :span="12">
-      <el-card shadow="hover">
-        <template #header><strong>各工种工资总额</strong></template>
-        <v-chart :option="barOption" autoresize style="height: 320px;" />
-      </el-card>
-    </el-col>
-  </el-row>
+  <div class="charts-grid">
+    <!-- Left: Horizontal bar for people count per job -->
+    <div class="chart-card">
+      <div class="section-title">工种人数分布</div>
+      <v-chart :option="countBarOption" autoresize class="chart-canvas" />
+    </div>
+
+    <!-- Right: Horizontal bar for salary per job, sorted by value -->
+    <div class="chart-card">
+      <div class="section-title">各工种工资总额</div>
+      <v-chart :option="salaryBarOption" autoresize class="chart-canvas" />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
-import { PieChart, BarChart } from 'echarts/charts'
+import { BarChart } from 'echarts/charts'
 import {
-  TitleComponent,
   TooltipComponent,
-  LegendComponent,
   GridComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { useAttendanceStore } from '@/stores/attendance'
 
-use([PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer])
+use([BarChart, TooltipComponent, GridComponent, CanvasRenderer])
 
 const store = useAttendanceStore()
 
@@ -44,40 +41,133 @@ const jobStats = computed(() => {
   return { countMap, salaryMap }
 })
 
-const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc']
+const palette = [
+  '#4F46E5', '#6366F1', '#818CF8',
+  '#10B981', '#34D399',
+  '#F97316', '#FB923C',
+  '#EF4444', '#F87171',
+  '#3B82F6', '#60A5FA',
+  '#8B5CF6', '#A78BFA',
+]
 
-const pieOption = computed(() => {
-  const data = Object.entries(jobStats.value.countMap).map(([name, value]) => ({ name, value }))
+const countBarOption = computed(() => {
+  const entries = Object.entries(jobStats.value.countMap)
+    .sort((a, b) => a[1] - b[1])
   return {
-    tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
-    legend: { bottom: 0, type: 'scroll' },
-    color: colors,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => `${params[0].name}: ${params[0].value}人`,
+    },
+    grid: { left: 70, right: 30, top: 10, bottom: 20 },
+    xAxis: {
+      type: 'value',
+      axisLabel: { color: '#94A3B8' },
+      splitLine: { lineStyle: { color: '#F1F5F9' } },
+    },
+    yAxis: {
+      type: 'category',
+      data: entries.map(e => e[0]),
+      axisLabel: { color: '#475569', fontSize: 12 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
     series: [{
-      type: 'pie',
-      radius: ['35%', '65%'],
-      center: ['50%', '45%'],
-      avoidLabelOverlap: true,
-      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-      label: { show: true, formatter: '{b}\n{c}人' },
-      data,
+      type: 'bar',
+      data: entries.map((e, i) => ({
+        value: e[1],
+        itemStyle: {
+          color: palette[i % palette.length],
+          borderRadius: [0, 4, 4, 0],
+        },
+      })),
+      barMaxWidth: 22,
+      label: {
+        show: true,
+        position: 'right' as const,
+        formatter: '{c}人',
+        color: '#475569',
+        fontSize: 11,
+      },
     }],
   }
 })
 
-const barOption = computed(() => {
+const salaryBarOption = computed(() => {
   const entries = Object.entries(jobStats.value.salaryMap)
     .sort((a, b) => a[1] - b[1])
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (params: any) => `${params[0].name}<br/>¥${params[0].value.toFixed(2)}` },
-    grid: { left: 80, right: 30, top: 20, bottom: 30 },
-    xAxis: { type: 'value', axisLabel: { formatter: (v: number) => `¥${(v / 1000).toFixed(0)}k` } },
-    yAxis: { type: 'category', data: entries.map(e => e[0]) },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => `${params[0].name}<br/>¥${params[0].value.toFixed(2)}`,
+    },
+    grid: { left: 70, right: 50, top: 10, bottom: 20 },
+    xAxis: {
+      type: 'value',
+      axisLabel: {
+        color: '#94A3B8',
+        formatter: (v: number) => v >= 10000 ? `${(v / 10000).toFixed(1)}万` : `${(v / 1000).toFixed(0)}k`,
+      },
+      splitLine: { lineStyle: { color: '#F1F5F9' } },
+    },
+    yAxis: {
+      type: 'category',
+      data: entries.map(e => e[0]),
+      axisLabel: { color: '#475569', fontSize: 12 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
     series: [{
       type: 'bar',
-      data: entries.map(e => Math.round(e[1] * 100) / 100),
-      itemStyle: { color: '#5470c6', borderRadius: [0, 4, 4, 0] },
-      barMaxWidth: 30,
+      data: entries.map((e, i) => ({
+        value: Math.round(e[1] * 100) / 100,
+        itemStyle: {
+          borderRadius: [0, 4, 4, 0],
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
+            colorStops: [
+              { offset: 0, color: '#4F46E5' },
+              { offset: 1, color: '#818CF8' },
+            ],
+          },
+        },
+      })),
+      barMaxWidth: 22,
+      label: {
+        show: true,
+        position: 'right' as const,
+        formatter: (p: any) => `¥${(p.value / 1000).toFixed(1)}k`,
+        color: '#475569',
+        fontSize: 11,
+      },
     }],
   }
 })
 </script>
+
+<style scoped>
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.chart-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--color-border-light);
+}
+.chart-canvas {
+  height: 320px;
+}
+
+@media (max-width: 1024px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
