@@ -114,4 +114,20 @@ const store = useAttendanceStore()
     grid-template-columns: repeat(2, 1fr);
   }
 }
+@media (max-width: 640px) {
+  .kpi-card {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+  .kpi-icon-circle {
+    width: 36px;
+    height: 36px;
+  }
+  .kpi-value {
+    font-size: var(--text-lg);
+  }
+  .kpi-label {
+    font-size: var(--text-xs);
+  }
+}
 </style>

@@ -354,5 +354,29 @@ const chartOption = computed(() => {
   .grand-grid {
     grid-template-columns: 1fr;
   }
+  .grand-card {
+    padding: var(--space-3);
+    gap: var(--space-3);
+  }
+  .grand-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .grand-value {
+    font-size: var(--text-xl);
+  }
+  .grand-value--salary {
+    font-size: var(--text-2xl);
+  }
+  .dash-card {
+    padding: var(--space-3);
+  }
+  .dash-chart {
+    height: 240px;
+  }
+  .dash-header {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
 }
 </style>

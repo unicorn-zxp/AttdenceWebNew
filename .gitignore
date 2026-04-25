@@ -43,3 +43,4 @@ mock_data/
 auto-imports.d.ts
 components.d.ts
 tsconfig.tsbuildinfo
+backend/data/

@@ -200,4 +200,21 @@ watch(activeTab, () => {
   justify-content: flex-end;
   margin-top: var(--space-4);
 }
+
+@media (max-width: 640px) {
+  .table-card {
+    padding: var(--space-3);
+  }
+  .tab-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .tab-toolbar .table-search {
+    width: 100%;
+  }
+  .pagination-bar {
+    justify-content: center;
+  }
+}
 </style>

@@ -140,4 +140,13 @@ function download(type: string) {
     grid-template-columns: 1fr;
   }
 }
+@media (max-width: 640px) {
+  .download-card {
+    padding: var(--space-3);
+  }
+  .download-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
 </style>

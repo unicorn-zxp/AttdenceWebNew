@@ -170,4 +170,12 @@ const salaryBarOption = computed(() => {
     grid-template-columns: 1fr;
   }
 }
+@media (max-width: 640px) {
+  .chart-card {
+    padding: var(--space-3);
+  }
+  .chart-canvas {
+    height: 260px;
+  }
+}
 </style>

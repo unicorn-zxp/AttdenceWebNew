@@ -106,4 +106,10 @@ const expanded = ref(false)
   margin-top: var(--space-3);
   cursor: default;
 }
+
+@media (max-width: 640px) {
+  .alert-card {
+    padding: var(--space-3);
+  }
+}
 </style>

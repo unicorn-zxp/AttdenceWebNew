@@ -127,4 +127,21 @@ function rowClassName({ row }: { row: any }) {
   justify-content: flex-end;
   margin-top: var(--space-4);
 }
+
+@media (max-width: 640px) {
+  .table-card {
+    padding: var(--space-3);
+  }
+  .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .table-search {
+    width: 100%;
+  }
+  .pagination-bar {
+    justify-content: center;
+  }
+}
 </style>

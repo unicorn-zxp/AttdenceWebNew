@@ -1,6 +1,13 @@
 <template>
   <div class="app-layout">
     <!-- Sidebar: only visible in calc tab -->
+    <!-- Mobile sidebar backdrop -->
+    <div
+      v-if="activeTab === 'calc' && !sidebarCollapsed"
+      class="sidebar-backdrop"
+      @click="sidebarCollapsed = true"
+    ></div>
+
     <transition name="sidebar">
       <aside
         v-show="activeTab === 'calc' && !sidebarCollapsed"
@@ -13,6 +20,9 @@
             <div class="brand-title">考勤工资计算</div>
             <div class="brand-subtitle">创新智成 · 西安东站</div>
           </div>
+          <button class="sidebar-close-btn" @click="sidebarCollapsed = true">
+            <el-icon :size="18"><Fold /></el-icon>
+          </button>
         </div>
 
         <!-- Scrollable Body -->
@@ -182,7 +192,7 @@
                   </svg>
                   <div>
                     <h2 class="flow-guide-title">上传数据文件，开始计算</h2>
-                    <p class="flow-guide-desc">请在左侧面板依次上传三个文件，然后点击「开始计算」</p>
+                    <p class="flow-guide-desc">请点击顶部 ≡ 按钮打开侧边栏，依次上传三个文件，然后点击「开始计算」</p>
                   </div>
                 </div>
 
@@ -732,14 +742,53 @@ onMounted(async () => {
 }
 
 /* ===== Responsive ===== */
+
+/* Mobile sidebar backdrop */
+.sidebar-backdrop {
+  display: none;
+}
+
+.sidebar-close-btn {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.08);
+  color: var(--color-text-inverse-secondary);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+.sidebar-close-btn:hover {
+  background: rgba(255,255,255,0.15);
+  color: var(--color-text-inverse);
+}
+
 @media (max-width: 1024px) {
   .sidebar {
     position: fixed;
     top: 0;
-    left: 0;
+    right: 0;
+    left: auto;
     height: 100vh;
+    width: 300px !important;
+    min-width: 300px !important;
     z-index: 100;
     box-shadow: var(--shadow-lg);
+  }
+  .sidebar-close-btn {
+    display: flex;
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99;
   }
   .step-cards {
     flex-direction: column;
@@ -748,6 +797,53 @@ onMounted(async () => {
   .step-connector {
     width: 2px;
     height: 16px;
+  }
+  .flow-guide {
+    padding: var(--space-4);
+  }
+  .flow-guide-header {
+    flex-direction: column;
+    gap: var(--space-2);
+    text-align: center;
+  }
+  .flow-guide-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .top-bar {
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+  }
+  .tab-btn {
+    padding: 6px 12px;
+    gap: 4px;
+    font-size: var(--text-sm);
+  }
+  .tab-btn .el-icon {
+    font-size: 14px;
+  }
+  .project-btn-name {
+    max-width: 72px;
+  }
+  .top-bar-right :deep(.el-tag) {
+    font-size: 11px;
+    padding: 0 6px;
+    height: 22px;
+  }
+  .content-scroll {
+    padding: var(--space-3);
+  }
+  .empty-state {
+    padding: var(--space-4) 0;
+  }
+  .step-card {
+    padding: var(--space-3);
+  }
+  .step-desc {
+    display: none;
   }
 }
 </style>
