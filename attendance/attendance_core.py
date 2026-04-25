@@ -607,6 +607,7 @@ def generate_ledger_sheet(
     from openpyxl.utils import get_column_letter
 
     wb = load_workbook(ledger_path)
+    wb_cache = load_workbook(ledger_path, data_only=True)  # for reading cached values
 
     # 查找模板sheet
     template_sheet = None
@@ -737,23 +738,25 @@ def generate_ledger_sheet(
     new_sheet.cell(row=total_row, column=16).font = bold_font
 
     # ==================== 更新年度工资汇总台账 ====================
-    _update_annual_summary(wb, sheet_name, salary_df, start_date)
+    _update_annual_summary(wb, wb_cache, sheet_name, salary_df, start_date)
 
     wb.save(output_path)
+    wb_cache.close()
     return output_path
 
 
-def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_date: tuple):
+def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFrame, start_date: tuple):
     """
     将工资数据回写到"年度工资汇总台账"sheet
 
     规则: 按起始月份确定写入列 (3月11日-4月10日 → 3月工资列)
     列映射: N月工资 = Col(8 + 2*N), N月代付 = Col(9 + 2*N)
 
-    新增人员追加到合计行之前（不使用 insert_rows，避免公式错乱）。
+    写入实际数值（而非公式），确保手机端也能正确显示。
 
     Args:
-        wb: 已打开的 openpyxl Workbook
+        wb: 已打开的 openpyxl Workbook (for writing)
+        wb_cache: 同文件以 data_only=True 打开的 Workbook (for reading cached values)
         sheet_name: 新增的工资表sheet名称
         salary_df: 工资汇总数据
         start_date: (年, 月, 日) 起始日期
@@ -766,10 +769,17 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
         return
 
     summary_sheet = wb['年度工资汇总台账']
+    summary_cache = wb_cache['年度工资汇总台账']
     _, start_month, _ = start_date
 
     # 计算目标列: N月工资 = Col(8 + 2*N)
     wage_col = 8 + 2 * start_month  # e.g. 3月 → Col 14
+
+    # 构建当前月工资查找: name → salary
+    current_salary = {}
+    for _, row in salary_df.iterrows():
+        name = str(row['姓名']).strip()
+        current_salary[name] = row['工资总额'] if row['工资总额'] > 0 else 0
 
     # 构建年度汇总中的姓名→行号映射 (Col C = column 3)
     existing_names = {}
@@ -802,24 +812,40 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
     # 用于复制新增行样式的参考行（合计行上一行）
     sample_data_row = total_row - 1
 
-    # 写入工资数据
-    # 工资合计公式: 各月工资之和 (col10=1月, col12=2月, ..., col32=12月)
-    salary_col_letters = [get_column_letter(8 + 2 * m) for m in range(1, 13)]
+    def _get_person_total_salary(row_idx):
+        """从缓存workbook读取某行的工资合计（各月工资之和）"""
+        total = 0.0
+        for m in range(1, 13):
+            col = 8 + 2 * m
+            if m == start_month:
+                # 当前月用我们计算的数据
+                name_val = summary_cache.cell(row=row_idx, column=3).value
+                name = str(name_val).strip() if name_val else ''
+                if name in current_salary:
+                    total += current_salary[name]
+                else:
+                    v = summary_cache.cell(row=row_idx, column=col).value
+                    if v and isinstance(v, (int, float)):
+                        total += float(v)
+            else:
+                v = summary_cache.cell(row=row_idx, column=col).value
+                if v and isinstance(v, (int, float)):
+                    total += float(v)
+        return round(total, 2)
 
+    # 写入工资数据
     new_people = []  # 记录需要新增的人员
     for _, row in salary_df.iterrows():
         name = str(row['姓名']).strip()
 
         if name in existing_names:
-            # 已有人员：写公式引用到月份列
+            # 已有人员：写入实际数值到月份列
             target_row = existing_names[name]
-            if name in new_sheet_names:
-                ref_row = new_sheet_names[name]
-                summary_sheet.cell(row=target_row, column=wage_col,
-                                   value=f"='{sheet_name}'!J{ref_row}")
-            # 更新工资合计公式（原模板可能有错公式或硬编码值）
+            salary_val = row['工资总额'] if row['工资总额'] > 0 else 0
+            summary_sheet.cell(row=target_row, column=wage_col, value=salary_val)
+            # 更新工资合计为实际累加值
             summary_sheet.cell(row=target_row, column=5,
-                               value=f'={"+".join(f"{cl}{target_row}" for cl in salary_col_letters)}')
+                               value=_get_person_total_salary(target_row))
         else:
             # 新增人员
             new_people.append((name, row))
@@ -861,26 +887,19 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
         # 填入新增人员（从 total_row+1 开始）
         for i, (name, row) in enumerate(new_people):
             new_row = total_row + 1 + i
-            summary_sheet.cell(row=new_row, column=1, value=f'=ROW()-3')
+            summary_sheet.cell(row=new_row, column=1, value=i + 1 + (total_row - 4))
             summary_sheet.cell(row=new_row, column=2, value='')
             summary_sheet.cell(row=new_row, column=3, value=name)
             summary_sheet.cell(row=new_row, column=4, value=row['工种'])
-            # 工资合计 = 各月工资之和 (col10=1月, col12=2月, ..., col32=12月)
-            salary_col_letters = [get_column_letter(8 + 2 * m) for m in range(1, 13)]
-            summary_sheet.cell(row=new_row, column=5,
-                               value=f'={"+".join(f"{cl}{new_row}" for cl in salary_col_letters)}')
-            # 代付合计 Col 6
-            col_letters = ['M', 'O', 'Q', 'S', 'U', 'W', 'Y', 'AA', 'AC', 'AE', 'AG']
-            summary_sheet.cell(row=new_row, column=6,
-                               value=f'={"+".join(f"{cl}{new_row}" for cl in col_letters)}')
-            summary_sheet.cell(row=new_row, column=8,
-                               value=f'=E{new_row}-F{new_row}-G{new_row}')
+            # 代付合计 Col 6 — 新人员无代付数据，写 0
+            summary_sheet.cell(row=new_row, column=6, value=0)
+            # 未支付金额 Col 8 = 工资合计 - 代付 - 吴超付
+            salary_val = row['工资总额'] if row['工资总额'] > 0 else 0
+            summary_sheet.cell(row=new_row, column=5, value=salary_val)
+            summary_sheet.cell(row=new_row, column=8, value=salary_val)
 
             # 写入当月工资
-            if name in new_sheet_names:
-                ref_row = new_sheet_names[name]
-                summary_sheet.cell(row=new_row, column=wage_col,
-                                   value=f"='{sheet_name}'!J{ref_row}")
+            summary_sheet.cell(row=new_row, column=wage_col, value=salary_val)
 
             # 复制样式
             for col_idx in range(1, summary_sheet.max_column + 1):
@@ -893,16 +912,23 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
                 if src.font:
                     dst.font = copy.copy(src.font)
 
-        # 更新合计行的求和公式（合计行位置不变，但SUM范围需包含新增行）
-        # 合计行的数据范围: data_start=4 到 data_end=合计行-1
+        # 更新合计行：计算实际数值（各月工资列求和）
         data_start = 4
-        # 新增人员插在合计行之后，需要包含到SUM范围
-        # 用不连续区域求和: SUM(4:合计行-1, 合计行+1:合计行+n)
         last_new_row = total_row + n
         for col_idx in range(5, 34):  # Col E ~ Col AG
-            cl = get_column_letter(col_idx)
+            total_val = 0.0
+            # 累加原始数据行 (data_start 到 total_row-1)
+            for r in range(data_start, total_row):
+                v = summary_sheet.cell(row=r, column=col_idx).value
+                if v and isinstance(v, (int, float)):
+                    total_val += float(v)
+            # 累加新增人员行 (total_row+1 到 last_new_row)
+            for r in range(total_row + 1, last_new_row + 1):
+                v = summary_sheet.cell(row=r, column=col_idx).value
+                if v and isinstance(v, (int, float)):
+                    total_val += float(v)
             summary_sheet.cell(row=total_row, column=col_idx,
-                               value=f'=SUM({cl}{data_start}:{cl}{total_row - 1},{cl}{total_row + 1}:{cl}{last_new_row})')
+                               value=round(total_val, 2))
 
 
 # ============================================================
