@@ -24,7 +24,7 @@
         </el-button>
 
         <el-button
-          v-if="store.calculated"
+          v-if="store.calculated || store.allUploaded"
           @click="store.reset()"
           style="width: 100%; margin-top: 10px;"
           size="large"

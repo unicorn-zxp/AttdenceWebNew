@@ -17,17 +17,17 @@
         style="width: 100%;"
       >
         <el-icon><Document /></el-icon>
-        {{ store.uploadStatus.roster ? '花名册已上传' : '上传花名册 (.xlsx)' }}
+        {{ store.uploadStatus.roster ? '花名册已上传（点击重选）' : '上传花名册 (.xlsx)' }}
       </el-button>
     </el-upload>
 
     <!-- Attendance -->
     <el-upload
-      :auto-upload="true"
+      :auto-upload="false"
       :show-file-list="false"
       accept=".xls,.xlsx"
       multiple
-      :http-request="(opts: any) => store.uploadAttendance([opts.file])"
+      :on-change="onAttendanceChange"
       :disabled="store.calculated"
       style="margin-top: 10px; display: block;"
     >
@@ -37,7 +37,7 @@
       >
         <el-icon><Calendar /></el-icon>
         {{ store.uploadStatus.attendance
-          ? `考勤已上传 (${store.uploadStatus.attendance_count}个文件)`
+          ? `考勤已上传 ${store.uploadStatus.attendance_count} 个文件（点击重选）`
           : '上传考勤记录 (.xls/.xlsx，可多选)' }}
       </el-button>
     </el-upload>
@@ -56,7 +56,7 @@
         style="width: 100%;"
       >
         <el-icon><Notebook /></el-icon>
-        {{ store.uploadStatus.ledger ? '台账已上传' : '上传工资台账 (.xlsx)' }}
+        {{ store.uploadStatus.ledger ? '台账已上传（点击重选）' : '上传工资台账 (.xlsx)' }}
       </el-button>
     </el-upload>
   </div>
@@ -66,4 +66,11 @@
 import { useAttendanceStore } from '@/stores/attendance'
 
 const store = useAttendanceStore()
+
+function onAttendanceChange(_file: any, fileList: any[]) {
+  const files = fileList.map((f: any) => f.raw).filter(Boolean)
+  if (files.length > 0) {
+    store.uploadAttendance(files)
+  }
+}
 </script>

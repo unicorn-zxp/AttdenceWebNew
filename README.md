@@ -108,13 +108,15 @@ Abay/
 
 ## Docker 服务
 
-### docker-compose.yml 服务定义
+### 服务与 Profile
 
-| 服务 | 镜像 | 端口 | 用途 |
-|------|------|------|------|
-| `yt-worker` | `./attendance` | 8501, 23181-23184 | Streamlit 备用 + 通用开发环境 |
-| `backend` | `./backend` | 8000 | FastAPI API 服务 |
-| `nginx` | `nginx/Dockerfile` | 8080 | **主入口**：Vue 前端 + API 反代 |
+所有服务都通过 Docker Compose Profile 隔离，默认不启动任何服务。
+
+| 服务 | Profile | 镜像 | 端口 | 用途 |
+|------|---------|------|------|------|
+| `backend` | `web` | `./backend` | 8000 | FastAPI API 服务 |
+| `nginx` | `web` | `nginx/Dockerfile` | 8080 | **主入口**：Vue 前端 + API 反代 |
+| `yt-worker` | `old` | `./attendance` | 8501 | Streamlit 备用（旧版） |
 
 ### Volume 挂载
 
@@ -125,20 +127,31 @@ backend:    ./backend    → /app                        # API 代码（热更�
 nginx:      无（构建时内嵌前端静态文件）
 ```
 
-### 常用命令
+### 启动命令
 
 ```bash
-# 只构建新服务（跳过 yt-worker）
-docker compose build backend nginx
+# 构建镜像
+docker compose build backend nginx          # 只构建新前端（推荐）
+docker compose --profile old build          # 只构建 Streamlit
+docker compose --profile web --profile old build  # 构建全部
 
-# 启动新服务
-docker compose up -d backend nginx
+# 启动新前端（backend + nginx） → http://localhost:8080
+docker compose --profile web up -d
 
-# 全部启动
-docker compose up -d
+# 启动 Streamlit 备用 → http://localhost:8501
+docker compose --profile old up -d
+
+# 启动全部3个服务
+docker compose --profile web --profile old up -d
+
+# 停止服务
+docker compose --profile web down
+docker compose --profile old down
+docker compose --profile web --profile old down
 
 # 查看日志
 docker compose logs -f backend
+docker compose logs -f nginx
 ```
 
 ---
@@ -479,7 +492,7 @@ Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
 | 组件 | Element Plus 组件 | 功能 |
 |------|-------------------|------|
 | `App.vue` | `el-container` | 主布局：320px侧边栏 + 弹性内容区 |
-| `FileUploadPanel` | 3×`el-upload` | 花名册/考勤/台账上传，上传后按钮变绿 |
+| `FileUploadPanel` | 3×`el-upload` | 花名册/考勤/台账上传，上传后按钮变绿并提示"点击重选"可覆盖重传 |
 | `ConfigPanel` | `el-slider` | 晚班容差配置（1-15分钟） |
 | `AlertBanner` | `el-alert` + `el-table` | 异常人员列表（可展开表格） |
 | `OverviewCards` | 4×`el-card` + `el-statistic` | 结算人数/工资总额/出勤工日/加班工时 |
@@ -492,11 +505,12 @@ Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
 
 ```
 1. 页面加载 → 自动创建会话（或恢复 localStorage 中的 session_id）
-2. 侧边栏上传3个文件（按钮逐一变绿）
+2. 侧边栏上传3个文件（按钮逐一变绿，提示"点击重选"可覆盖重传）
 3. 调整容差配置（可选）
 4. 点击"开始计算" → loading 状态
 5. 计算完成 → 展示：异常告警 → 概览卡片 → 图表 → 工资表 → 考勤明细 → 下载按钮
 6. 点击"重置" → 清除会话，回到上传界面
+注：上传完毕后即可点击"重置"，无需等到计算完成
 ```
 
 ---
@@ -536,12 +550,14 @@ npx pnpm dev    # http://localhost:3000，Vite 自动代理 /api → :8000
 ### Docker
 
 ```bash
-docker compose build backend nginx
-docker compose up -d backend nginx
+# 启动新前端 → http://localhost:8080
+docker compose --profile web up -d
 
-# http://localhost:8080  → Vue 新前端（主入口）
-# http://localhost:8000  → FastAPI API（调试用）
-# http://localhost:8501  → Streamlit 备用
+# 启动 Streamlit → http://localhost:8501
+docker compose --profile old up -d
+
+# 全部启动
+docker compose --profile web --profile old up -d
 ```
 
 ---
