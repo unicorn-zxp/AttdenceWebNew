@@ -1,0 +1,65 @@
+services:
+  # ============================================================
+  # Existing Streamlit worker (unchanged)
+  # ============================================================
+  yt-worker:
+    build: ./attendance
+    container_name: Abay-worker
+    ports:
+      - 8501:8501
+      - 23181:23181
+      - 23182:23182
+      - 23183:23183
+      - 23184:23184
+    volumes:
+      - ./attendance:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    profiles:
+      - old
+
+  # ============================================================
+  # FastAPI backend (new)
+  # ============================================================
+  backend:
+    build: ./backend
+    container_name: Abay-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./attendance:/app/attendance:ro
+    environment:
+      - ATTENDANCE_CORE_DIR=/app/attendance
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    profiles:
+      - web
+
+  # ============================================================
+  # Nginx: Vue frontend + reverse proxy (new)
+  # ============================================================
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: Abay-nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles:
+      - web

@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# Excel files
+*.xlsx
+*.xls
+
+# Output
+output/
+file/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Mock data
+mock_data/
+
+# Logs
+*.log
+
+# Auto-generated
+auto-imports.d.ts
+components.d.ts
+tsconfig.tsbuildinfo
