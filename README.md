@@ -791,6 +791,90 @@ docker compose --profile web --profile old up -d
 
 ---
 
+## 公网部署（cpolar 内网穿透）
+
+通过 cpolar 将本地服务暴露到公网，无需云服务器，其他人通过公网地址即可访问。
+
+### 适用场景
+
+- 多个工地负责人在不同网络环境下传考勤数据
+- 大老板在办公室查看各项目工资汇总
+- 2-3 个偶发用户，不需要 24 小时高可用
+
+### 架构
+
+```
+A负责人(工地) ──┐
+                │    公网                  内网
+大老板(办公室) ──┼──→ cpolar.top ──→ 你的电脑:8080 ──→ Docker(Nginx+FastAPI+SQLite)
+                │
+B负责人(工地) ──┘
+```
+
+### 安装与配置
+
+```bash
+# 1. 安装 cpolar
+curl -L https://www.cpolar.com/static/downloads/install-release-cpolar.sh | sudo bash
+
+# 2. 注册账号（https://dashboard.cpolar.com/signup），获取 authtoken
+sudo cpolar authtoken 你的authtoken
+
+# 3. 启动 Docker 服务
+cd ~/Documents/Abay/Web
+docker compose --profile web up -d
+
+# 4. 启动 cpolar 并设为开机自启
+sudo systemctl enable cpolar
+sudo systemctl start cpolar
+
+# 5. 创建隧道（通过管理面板 API）
+curl -X POST http://localhost:9200/api/tunnels \
+  -H "Content-Type: application/json" \
+  -d '{"addr":"8080","proto":"http","name":"attendance"}'
+```
+
+### 获取公网地址
+
+```bash
+# 方式1：创建隧道时返回
+# 方式2：访问管理面板 http://localhost:9200 查看
+# 方式3：查询 API
+curl http://localhost:9200/api/tunnels
+```
+
+地址格式：`http://xxxxxxxx.r30.cpolar.top`（HTTP，不是 HTTPS）
+
+### 使用方式
+
+| 角色 | 操作 |
+|------|------|
+| 项目负责人 | 打开公网地址 → 选择项目 → 「考勤计算」上传文件并计算 |
+| 大老板 | 打开公网地址 → 「数据看板」→ 顶部切换项目查看各工地汇总 |
+
+### 注意事项
+
+- 你的电脑必须保持开机，不能关机或休眠
+- 免费 cpolar 隧道每次重启地址会变，需重新发送给他人
+- 长期使用建议购买固定域名（9元/月）
+- **必须用 HTTP 访问，不要用 HTTPS**（免费版不支持）
+- cpolar 管理面板地址：`http://localhost:9200`
+
+### 重新创建隧道（地址变了之后）
+
+```bash
+# 重启 cpolar
+sudo systemctl restart cpolar
+sleep 3
+
+# 重新创建隧道
+curl -X POST http://localhost:9200/api/tunnels \
+  -H "Content-Type: application/json" \
+  -d '{"addr":"8080","proto":"http","name":"attendance"}'
+```
+
+---
+
 ## 测试数据
 
 `attendance/mock_data/` 目录含测试用文件：
