@@ -887,11 +887,13 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
         # 更新合计行的求和公式（合计行位置不变，但SUM范围需包含新增行）
         # 合计行的数据范围: data_start=4 到 data_end=合计行-1
         data_start = 4
-        data_end = total_row - 1
+        # 新增人员插在合计行之后，需要包含到SUM范围
+        # 用不连续区域求和: SUM(4:合计行-1, 合计行+1:合计行+n)
+        last_new_row = total_row + n
         for col_idx in range(5, 34):  # Col E ~ Col AG
             cl = get_column_letter(col_idx)
             summary_sheet.cell(row=total_row, column=col_idx,
-                               value=f'=SUM({cl}{data_start}:{cl}{data_end})')
+                               value=f'=SUM({cl}{data_start}:{cl}{total_row - 1},{cl}{total_row + 1}:{cl}{last_new_row})')
 
 
 # ============================================================
