@@ -20,6 +20,7 @@
       :data="pagedData"
       stripe
       size="default"
+      :max-height="500"
       :default-sort="{ prop: '序号', order: 'ascending' }"
       :row-class-name="rowClassName"
       class="salary-table"
