@@ -19,8 +19,10 @@
           <span v-else>1</span>
         </div>
         <div class="upload-info">
-          <span class="upload-label">{{ store.uploadStatus.roster ? '花名册已上传' : '上传花名册' }}</span>
-          <span class="upload-hint">.xlsx</span>
+          <span class="upload-label">
+            {{ store.uploadStatus.roster ? store.uploadStatus.roster_filename || '花名册已上传' : '上传花名册' }}
+          </span>
+          <span class="upload-hint">{{ store.uploadStatus.roster ? '花名册' : '.xlsx 劳务人员花名册' }}</span>
         </div>
         <el-icon v-if="store.uploadStatus.roster" class="upload-done-icon"><CircleCheckFilled /></el-icon>
       </div>
@@ -44,10 +46,14 @@
         <div class="upload-info">
           <span class="upload-label">
             {{ store.uploadStatus.attendance
-              ? `考勤已上传`
+              ? `${store.uploadStatus.attendance_count} 个考勤文件`
               : '上传考勤记录' }}
           </span>
-          <span class="upload-hint">{{ store.uploadStatus.attendance ? `${store.uploadStatus.attendance_count} 个文件` : '.xls/.xlsx 多选' }}</span>
+          <span class="upload-hint">
+            {{ store.uploadStatus.attendance
+              ? (store.uploadStatus.attendance_filenames || []).join(', ')
+              : '.xls/.xlsx 可多选' }}
+          </span>
         </div>
         <el-icon v-if="store.uploadStatus.attendance" class="upload-done-icon"><CircleCheckFilled /></el-icon>
       </div>
@@ -68,8 +74,10 @@
           <span v-else>3</span>
         </div>
         <div class="upload-info">
-          <span class="upload-label">{{ store.uploadStatus.ledger ? '台账已上传' : '上传工资台账' }}</span>
-          <span class="upload-hint">.xlsx</span>
+          <span class="upload-label">
+            {{ store.uploadStatus.ledger ? store.uploadStatus.ledger_filename || '台账已上传' : '上传工资台账' }}
+          </span>
+          <span class="upload-hint">{{ store.uploadStatus.ledger ? '工资台账' : '.xlsx 现有工资台账' }}</span>
         </div>
         <el-icon v-if="store.uploadStatus.ledger" class="upload-done-icon"><CircleCheckFilled /></el-icon>
       </div>
@@ -95,7 +103,7 @@ function onAttendanceChange(_file: any, fileList: any[]) {
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--color-text-inverse-secondary);
-  margin: 0 0 var(--space-3) 0;
+  margin: 0 0 var(--space-4) 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -117,13 +125,13 @@ function onAttendanceChange(_file: any, fileList: any[]) {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.04);
   cursor: pointer;
   transition: all var(--transition-fast);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
   width: 100%;
   box-sizing: border-box;
 }
@@ -137,8 +145,8 @@ function onAttendanceChange(_file: any, fileList: any[]) {
 }
 
 .upload-step {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.2);
   display: flex;
@@ -174,7 +182,10 @@ function onAttendanceChange(_file: any, fileList: any[]) {
   display: block;
   font-size: 11px;
   color: var(--color-text-inverse-secondary);
-  margin-top: 1px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .upload-done-icon {

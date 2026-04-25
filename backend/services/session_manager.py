@@ -24,6 +24,11 @@ class SessionData:
         self.attendance_paths: list[str] = []
         self.ledger_path: Optional[str] = None
 
+        # Original file names (for display)
+        self.roster_filename: Optional[str] = None
+        self.attendance_filenames: list[str] = []
+        self.ledger_filename: Optional[str] = None
+
         # Config
         self.late_tolerance: int = 10
         self.project_id: int = 1

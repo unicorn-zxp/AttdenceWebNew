@@ -421,10 +421,10 @@ onMounted(async () => {
 .sidebar-body {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 .sidebar-body::-webkit-scrollbar {
   width: 4px;
@@ -437,8 +437,8 @@ onMounted(async () => {
 .sidebar-box {
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-4);
 }
 .sidebar-box--actions {
   background: rgba(255,255,255,0.02);

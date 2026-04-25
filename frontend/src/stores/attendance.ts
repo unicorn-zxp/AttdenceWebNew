@@ -130,6 +130,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     const form = new FormData()
     form.append('file', file)
     await client.post('/upload/roster', form)
+    uploadStatus.value.roster_filename = file.name
     await refreshStatus()
   }
 
@@ -137,6 +138,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     const form = new FormData()
     files.forEach((f) => form.append('files', f))
     await client.post('/upload/attendance', form)
+    uploadStatus.value.attendance_filenames = files.map((f) => f.name)
     await refreshStatus()
   }
 
@@ -144,6 +146,7 @@ export const useAttendanceStore = defineStore('attendance', () => {
     const form = new FormData()
     form.append('file', file)
     await client.post('/upload/ledger', form)
+    uploadStatus.value.ledger_filename = file.name
     await refreshStatus()
   }
 

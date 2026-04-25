@@ -31,6 +31,7 @@ async def upload_roster(session_id: str = Query(...), file: UploadFile = File(..
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
     session.roster_path = dest
+    session.roster_filename = file.filename
     return {"status": "ok", "filename": file.filename}
 
 
@@ -41,13 +42,16 @@ async def upload_attendance(session_id: str = Query(...), files: list[UploadFile
         raise HTTPException(404, "会话不存在")
 
     paths = []
+    names = []
     for i, file in enumerate(files):
         ext = _validate_ext(file.filename, ALLOWED_EXTENSIONS["attendance"])
         dest = os.path.join(session.temp_dir, f"员工刷卡记录表{i+1}{ext}")
         with open(dest, "wb") as f:
             shutil.copyfileobj(file.file, f)
         paths.append(dest)
+        names.append(file.filename)
     session.attendance_paths = paths
+    session.attendance_filenames = names
     return {"status": "ok", "count": len(files)}
 
 
@@ -66,6 +70,7 @@ async def upload_ledger(
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
     session.ledger_path = dest
+    session.ledger_filename = file.filename
     session.project_id = project_id
 
     # Seed historical monthly data from existing ledger sheets
@@ -89,4 +94,7 @@ async def upload_status(session_id: str = Query(...)):
         "ledger": session.ledger_path is not None,
         "attendance_count": len(session.attendance_paths),
         "project_id": getattr(session, "project_id", 1),
+        "roster_filename": session.roster_filename,
+        "attendance_filenames": session.attendance_filenames,
+        "ledger_filename": session.ledger_filename,
     }

@@ -284,56 +284,30 @@ def seed_from_ledger(project_id: int, ledger_path: str):
         total_salary = 0.0
         total_workdays = 0
         total_overtime = 0.0
-        found_total = False
 
-        # Strategy 1: find 合计 row and read its totals
+        # Always sum individual data rows (rows with a name in col3).
+        # Stop at 合计/总计 row or first empty-name row after data.
         for row_idx in range(6, ws.max_row + 1):
             first_val = ws.cell(row=row_idx, column=1).value
             val_str = str(first_val).strip() if first_val else ""
-
             if val_str in ("合计", "总计"):
-                salary_val = ws.cell(row=row_idx, column=10).value
-                workdays_val = ws.cell(row=row_idx, column=5).value
-                overtime_val = ws.cell(row=row_idx, column=7).value
-
-                if salary_val and isinstance(salary_val, (int, float)):
-                    total_salary = float(salary_val)
-                if workdays_val and isinstance(workdays_val, (int, float)):
-                    total_workdays = int(workdays_val)
-                if overtime_val and isinstance(overtime_val, (int, float)):
-                    total_overtime = float(overtime_val)
-                found_total = True
                 break
 
             name = ws.cell(row=row_idx, column=3).value
-            if name and str(name).strip():
-                people += 1
+            if not name or str(name).strip() == "":
+                continue
 
-        # Strategy 2: fallback — sum individual rows
-        if not found_total or (total_salary == 0 and people > 0):
-            total_salary = 0.0
-            total_workdays = 0
-            total_overtime = 0.0
-            people = 0
-            for row_idx in range(6, ws.max_row + 1):
-                first_val = ws.cell(row=row_idx, column=1).value
-                if first_val and str(first_val).strip() in ("合计", "总计"):
-                    break
-                name = ws.cell(row=row_idx, column=3).value
-                if not name or str(name).strip() == "":
-                    continue
+            people += 1
+            salary = ws.cell(row=row_idx, column=10).value
+            workdays = ws.cell(row=row_idx, column=5).value
+            overtime = ws.cell(row=row_idx, column=7).value
 
-                people += 1
-                salary = ws.cell(row=row_idx, column=10).value
-                workdays = ws.cell(row=row_idx, column=5).value
-                overtime = ws.cell(row=row_idx, column=7).value
-
-                if salary and isinstance(salary, (int, float)):
-                    total_salary += float(salary)
-                if workdays and isinstance(workdays, (int, float)):
-                    total_workdays += int(workdays)
-                if overtime and isinstance(overtime, (int, float)):
-                    total_overtime += float(overtime)
+            if salary and isinstance(salary, (int, float)):
+                total_salary += float(salary)
+            if workdays and isinstance(workdays, (int, float)):
+                total_workdays += int(workdays)
+            if overtime and isinstance(overtime, (int, float)):
+                total_overtime += float(overtime)
 
         upsert_month(
             project_id=project_id,

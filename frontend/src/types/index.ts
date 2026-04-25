@@ -39,6 +39,9 @@ export interface UploadStatus {
   ledger: boolean
   attendance_count: number
   project_id?: number
+  roster_filename?: string
+  attendance_filenames?: string[]
+  ledger_filename?: string
 }
 
 export interface SalaryResponse {
