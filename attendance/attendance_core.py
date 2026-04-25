@@ -803,6 +803,9 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
     sample_data_row = total_row - 1
 
     # 写入工资数据
+    # 工资合计公式: 各月工资之和 (col10=1月, col12=2月, ..., col32=12月)
+    salary_col_letters = [get_column_letter(8 + 2 * m) for m in range(1, 13)]
+
     new_people = []  # 记录需要新增的人员
     for _, row in salary_df.iterrows():
         name = str(row['姓名']).strip()
@@ -814,6 +817,9 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
                 ref_row = new_sheet_names[name]
                 summary_sheet.cell(row=target_row, column=wage_col,
                                    value=f"='{sheet_name}'!J{ref_row}")
+            # 更新工资合计公式（原模板可能有错公式或硬编码值）
+            summary_sheet.cell(row=target_row, column=5,
+                               value=f'={"+".join(f"{cl}{target_row}" for cl in salary_col_letters)}')
         else:
             # 新增人员
             new_people.append((name, row))
@@ -859,7 +865,10 @@ def _update_annual_summary(wb, sheet_name: str, salary_df: pd.DataFrame, start_d
             summary_sheet.cell(row=new_row, column=2, value='')
             summary_sheet.cell(row=new_row, column=3, value=name)
             summary_sheet.cell(row=new_row, column=4, value=row['工种'])
-            summary_sheet.cell(row=new_row, column=5, value=0)
+            # 工资合计 = 各月工资之和 (col10=1月, col12=2月, ..., col32=12月)
+            salary_col_letters = [get_column_letter(8 + 2 * m) for m in range(1, 13)]
+            summary_sheet.cell(row=new_row, column=5,
+                               value=f'={"+".join(f"{cl}{new_row}" for cl in salary_col_letters)}')
             # 代付合计 Col 6
             col_letters = ['M', 'O', 'Q', 'S', 'U', 'W', 'Y', 'AA', 'AC', 'AE', 'AG']
             summary_sheet.cell(row=new_row, column=6,
