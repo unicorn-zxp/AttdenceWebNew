@@ -73,49 +73,74 @@
     <div class="main-area">
       <!-- Top Bar -->
       <header class="top-bar">
-        <!-- Collapse btn: only in calc tab -->
-        <button
-          v-if="activeTab === 'calc'"
-          class="collapse-btn"
-          @click="sidebarCollapsed = !sidebarCollapsed"
-        >
-          <el-icon :size="18">
-            <Fold v-if="!sidebarCollapsed" />
-            <Expand v-else />
-          </el-icon>
-        </button>
+        <!-- Left: Brand + Nav Tabs -->
+        <div class="top-bar-left">
+          <!-- Sidebar toggle (calc mode) -->
+          <button
+            v-if="activeTab === 'calc'"
+            class="collapse-btn"
+            @click="sidebarCollapsed = !sidebarCollapsed"
+          >
+            <el-icon :size="18">
+              <Fold v-if="!sidebarCollapsed" />
+              <Expand v-else />
+            </el-icon>
+          </button>
 
-        <!-- Brand when on dashboard (no sidebar) -->
-        <div v-else class="top-bar-brand">
-          <div class="brand-icon brand-icon--small">创</div>
-          <span class="top-bar-company">合肥创新智成</span>
+          <!-- Brand -->
+          <div class="top-bar-brand">
+            <div class="brand-icon brand-icon--small">创</div>
+            <span class="top-bar-company">合肥创新智成</span>
+          </div>
+
+          <!-- Divider -->
+          <div class="top-bar-divider"></div>
+
+          <!-- Tab Navigation -->
+          <div class="top-bar-tabs">
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'dashboard' }"
+              @click="activeTab = 'dashboard'"
+            >
+              <el-icon><DataAnalysis /></el-icon>
+              数据看板
+            </button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeTab === 'calc' }"
+              @click="activeTab = 'calc'"
+            >
+              <el-icon><EditPen /></el-icon>
+              考勤计算
+            </button>
+          </div>
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="top-bar-tabs">
-          <button
-            class="tab-btn"
-            :class="{ active: activeTab === 'dashboard' }"
-            @click="activeTab = 'dashboard'"
-          >
-            <el-icon><DataAnalysis /></el-icon>
-            数据看板
-          </button>
-          <button
-            class="tab-btn"
-            :class="{ active: activeTab === 'calc' }"
-            @click="activeTab = 'calc'"
-          >
-            <el-icon><EditPen /></el-icon>
-            考勤计算
-          </button>
-        </div>
+        <!-- Right: Project + Status -->
+        <div class="top-bar-right">
+          <!-- Status Tag -->
+          <template v-if="activeTab === 'calc'">
+            <el-tag v-if="store.calculated" type="success" effect="light" round size="small">
+              <el-icon><CircleCheck /></el-icon> 计算完成
+            </el-tag>
+            <el-tag v-else-if="store.allUploaded" type="warning" effect="light" round size="small">
+              <el-icon><Clock /></el-icon> 待计算
+            </el-tag>
+            <el-tag v-else effect="plain" round size="small">
+              <el-icon><Upload /></el-icon> 上传中 {{ uploadProgress }}/3
+            </el-tag>
+          </template>
+          <template v-else>
+            <el-tag effect="plain" round size="small">
+              {{ store.annualData.length }} 个月数据
+            </el-tag>
+          </template>
 
-        <!-- Project Selector -->
-        <div class="project-selector">
+          <!-- Project Selector -->
           <el-dropdown trigger="click" @command="onProjectCommand">
             <button class="project-btn">
-              <el-icon :size="16"><OfficeBuilding /></el-icon>
+              <el-icon :size="15"><OfficeBuilding /></el-icon>
               <span class="project-btn-name">{{ store.activeProject?.name || '选择项目' }}</span>
               <el-icon :size="12" class="project-btn-arrow"><ArrowDown /></el-icon>
             </button>
@@ -135,28 +160,8 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-        </div>
 
-        <!-- Right status -->
-        <div class="top-bar-right">
-          <template v-if="activeTab === 'calc'">
-            <el-tag v-if="store.calculated" type="success" effect="light" round>
-              <el-icon><CircleCheck /></el-icon> 计算完成
-            </el-tag>
-            <el-tag v-else-if="store.allUploaded" type="warning" effect="light" round>
-              <el-icon><Clock /></el-icon> 待计算
-            </el-tag>
-            <el-tag v-else effect="plain" round>
-              <el-icon><Upload /></el-icon> 上传中 {{ uploadProgress }}/3
-            </el-tag>
-          </template>
-          <template v-else>
-            <el-tag effect="plain" round>
-              {{ store.annualData.length }} 个月数据
-            </el-tag>
-          </template>
-
-          <!-- Delete project (only if more than 1) -->
+          <!-- Delete project -->
           <el-popconfirm
             v-if="store.projects.length > 1"
             title="确定删除此项目及其所有数据？"
@@ -165,7 +170,7 @@
             @confirm="store.deleteProject(store.activeProjectId)"
           >
             <template #reference>
-              <el-button text size="small" type="danger">
+              <el-button text size="small" type="danger" class="project-del-btn">
                 <el-icon><Delete /></el-icon>
               </el-button>
             </template>
@@ -475,15 +480,32 @@ onMounted(async () => {
 
 /* ===== Top Bar ===== */
 .top-bar {
-  height: var(--header-height);
+  height: 64px;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: space-between;
   padding: 0 var(--space-6);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.top-bar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border);
+}
+
 .collapse-btn {
   width: 36px;
   height: 36px;
@@ -508,25 +530,25 @@ onMounted(async () => {
 }
 .top-bar-company {
   font-size: var(--text-md);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-primary);
   white-space: nowrap;
+  letter-spacing: 0.5px;
 }
 
 /* ===== Tab Navigation ===== */
 .top-bar-tabs {
   display: flex;
-  gap: 0;
+  gap: 4px;
   background: var(--color-bg);
   border-radius: var(--radius-lg);
   padding: 4px;
-  border: 1px solid var(--color-border-light);
 }
 .tab-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 22px;
+  gap: 6px;
+  padding: 7px 20px;
   border: none;
   border-radius: var(--radius-md);
   background: transparent;
@@ -534,34 +556,23 @@ onMounted(async () => {
   font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: all var(--transition-fast);
   white-space: nowrap;
-  position: relative;
 }
 .tab-btn .el-icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 .tab-btn:hover {
   color: var(--color-text-secondary);
+  background: rgba(0,0,0,0.03);
 }
 .tab-btn.active {
   background: var(--color-brand);
   color: white;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
-}
-
-.top-bar-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.3);
 }
 
 /* ===== Project Selector ===== */
-.project-selector {
-  display: flex;
-  align-items: center;
-}
 .project-btn {
   display: flex;
   align-items: center;
@@ -822,8 +833,17 @@ onMounted(async () => {
 
 @media (max-width: 640px) {
   .top-bar {
+    height: 56px;
     padding: 0 var(--space-3);
+  }
+  .top-bar-left {
     gap: var(--space-2);
+  }
+  .top-bar-company {
+    font-size: var(--text-sm);
+  }
+  .top-bar-divider {
+    display: none;
   }
   .tab-btn {
     padding: 6px 12px;
@@ -834,7 +854,7 @@ onMounted(async () => {
     font-size: 14px;
   }
   .project-btn-name {
-    max-width: 72px;
+    max-width: 60px;
   }
   .top-bar-right :deep(.el-tag) {
     font-size: 11px;
