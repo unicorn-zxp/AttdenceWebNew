@@ -119,7 +119,7 @@
 
         <!-- Right: Project + Status -->
         <div class="top-bar-right">
-          <!-- Status Tag -->
+          <!-- Status Tag (calc tab only) -->
           <template v-if="activeTab === 'calc'">
             <el-tag v-if="store.calculated" type="success" effect="light" round size="small">
               <el-icon><CircleCheck /></el-icon> 计算完成
@@ -129,11 +129,6 @@
             </el-tag>
             <el-tag v-else effect="plain" round size="small">
               <el-icon><Upload /></el-icon> 上传中 {{ uploadProgress }}/3
-            </el-tag>
-          </template>
-          <template v-else>
-            <el-tag effect="plain" round size="small">
-              {{ store.annualData.length }} 个月数据
             </el-tag>
           </template>
 

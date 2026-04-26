@@ -3,8 +3,13 @@
     <!-- Page Header -->
     <div class="dash-header">
       <div>
-        <h2 class="dash-title">{{ new Date().getFullYear() }} 年度工资总览</h2>
-        <p class="dash-desc">创新智成 · 西安东站项目全年工资数据汇总</p>
+        <h2 class="dash-title">
+          {{ new Date().getFullYear() }} 年度工资总览
+          <el-tag v-if="store.annualData.length > 0" effect="plain" round size="small" class="dash-months-tag">
+            {{ store.annualData.length }} 个月数据
+          </el-tag>
+        </h2>
+        <p class="dash-desc">{{ store.activeProject?.name || '默认项目' }} · 全年工资数据汇总</p>
       </div>
       <el-button @click="store.fetchAnnual()" :icon="Refresh" circle size="small" />
     </div>
@@ -213,6 +218,12 @@ const chartOption = computed(() => {
   font-weight: 700;
   color: var(--color-text-primary);
   margin: 0 0 var(--space-1) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dash-months-tag {
+  font-size: 12px;
 }
 .dash-desc {
   font-size: var(--text-sm);
