@@ -15,10 +15,10 @@
       >
         <!-- Brand Header -->
         <div class="sidebar-brand">
-          <div class="brand-icon">A</div>
+          <div class="brand-icon">创</div>
           <div class="brand-text">
-            <div class="brand-title">考勤工资计算</div>
-            <div class="brand-subtitle">创新智成 · 西安东站</div>
+            <div class="brand-title">合肥创新智成</div>
+            <div class="brand-subtitle">考勤工资管理系统</div>
           </div>
           <button class="sidebar-close-btn" @click="sidebarCollapsed = true">
             <el-icon :size="18"><Fold /></el-icon>
@@ -85,9 +85,10 @@
           </el-icon>
         </button>
 
-        <!-- Brand icon when on dashboard (no sidebar) -->
+        <!-- Brand when on dashboard (no sidebar) -->
         <div v-else class="top-bar-brand">
-          <div class="brand-icon brand-icon--small">A</div>
+          <div class="brand-icon brand-icon--small">创</div>
+          <span class="top-bar-company">合肥创新智成</span>
         </div>
 
         <!-- Tab Navigation -->
@@ -503,6 +504,13 @@ onMounted(async () => {
 .top-bar-brand {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+}
+.top-bar-company {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
 }
 
 /* ===== Tab Navigation ===== */

@@ -797,11 +797,14 @@ def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFram
             new_sheet_names[str(name_val).strip()] = row_idx
 
     # 找到合计行和总计行的位置
+    # 注意：可能有多个"合计"行（分组小计），取最后一个作为 total_row
     total_row = None
+    prev_total_row = None  # 倒数第二个合计行
     grand_total_row = None
     for row_idx in range(4, summary_sheet.max_row + 1):
         val = summary_sheet.cell(row=row_idx, column=1).value
         if val == '合计':
+            prev_total_row = total_row
             total_row = row_idx
         elif val == '总计':
             grand_total_row = row_idx
@@ -809,12 +812,8 @@ def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFram
     if not total_row:
         return
 
-    # 找到合计行之前最后一个"小计"行（col3含"合"），用于确定合计的求和范围
-    last_subtotal_row = 3  # 默认从数据起始行之前
-    for r in range(4, total_row):
-        c3 = summary_sheet.cell(row=r, column=3).value
-        if c3 and '合' in str(c3).strip() and str(c3).strip() != '合计':
-            last_subtotal_row = r
+    # 最后一组数据的起始行：上一个合计行+1（或4如果没有上一个）
+    group_start = (prev_total_row + 1) if prev_total_row else 4
 
     # 用于复制新增行样式的参考行（合计行上一行）
     sample_data_row = total_row - 1
@@ -919,8 +918,7 @@ def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFram
                 if src.font:
                     dst.font = copy.copy(src.font)
 
-        # 更新合计行：只求和最后一组数据（从小计行+1到合计行-1）
-        group_start = last_subtotal_row + 1
+        # 更新合计行：只求和最后一组数据（从上一个合计+1到当前合计-1）
         last_new_row = total_row + n
         for col_idx in range(5, 34):  # Col E ~ Col AG
             group_total = 0.0
