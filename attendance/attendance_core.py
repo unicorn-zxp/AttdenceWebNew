@@ -918,12 +918,12 @@ def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFram
                 if src.font:
                     dst.font = copy.copy(src.font)
 
-        # 更新合计行：只求和最后一组数据（从上一个合计+1到当前合计-1）
+        # 更新合计行：从缓存workbook读取数值求和（避免公式字符串问题）
         last_new_row = total_row + n
         for col_idx in range(5, 34):  # Col E ~ Col AG
             group_total = 0.0
             for r in range(group_start, total_row):
-                v = summary_sheet.cell(row=r, column=col_idx).value
+                v = summary_cache.cell(row=r, column=col_idx).value
                 if v and isinstance(v, (int, float)):
                     group_total += float(v)
             summary_sheet.cell(row=total_row, column=col_idx,
