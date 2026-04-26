@@ -38,7 +38,7 @@ async def download_ledger(session_id: str = Query(...)):
     return FileResponse(
         session.ledger_output_path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename="工资台账2026（超）.xlsx",
+        filename=session.ledger_filename or "工资台账.xlsx",
     )
 
 
