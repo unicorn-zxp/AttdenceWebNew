@@ -809,6 +809,13 @@ def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFram
     if not total_row:
         return
 
+    # 找到合计行之前最后一个"小计"行（col3含"合"），用于确定合计的求和范围
+    last_subtotal_row = 3  # 默认从数据起始行之前
+    for r in range(4, total_row):
+        c3 = summary_sheet.cell(row=r, column=3).value
+        if c3 and '合' in str(c3).strip() and str(c3).strip() != '合计':
+            last_subtotal_row = r
+
     # 用于复制新增行样式的参考行（合计行上一行）
     sample_data_row = total_row - 1
 
@@ -912,23 +919,32 @@ def _update_annual_summary(wb, wb_cache, sheet_name: str, salary_df: pd.DataFram
                 if src.font:
                     dst.font = copy.copy(src.font)
 
-        # 更新合计行：计算实际数值（各月工资列求和）
-        data_start = 4
+        # 更新合计行：只求和最后一组数据（从小计行+1到合计行-1）
+        group_start = last_subtotal_row + 1
         last_new_row = total_row + n
         for col_idx in range(5, 34):  # Col E ~ Col AG
-            total_val = 0.0
-            # 累加原始数据行 (data_start 到 total_row-1)
-            for r in range(data_start, total_row):
+            group_total = 0.0
+            for r in range(group_start, total_row):
                 v = summary_sheet.cell(row=r, column=col_idx).value
                 if v and isinstance(v, (int, float)):
-                    total_val += float(v)
-            # 累加新增人员行 (total_row+1 到 last_new_row)
-            for r in range(total_row + 1, last_new_row + 1):
-                v = summary_sheet.cell(row=r, column=col_idx).value
-                if v and isinstance(v, (int, float)):
-                    total_val += float(v)
+                    group_total += float(v)
             summary_sheet.cell(row=total_row, column=col_idx,
-                               value=round(total_val, 2))
+                               value=round(group_total, 2))
+
+        # 更新总计行：原有值 + 新增人员总和
+        if grand_total_row:
+            new_grand_total_row = grand_total_row + n
+            for col_idx in range(5, 34):
+                # 读取原总计的缓存值
+                cached = summary_cache.cell(row=grand_total_row, column=col_idx).value
+                grand_val = float(cached) if cached and isinstance(cached, (int, float)) else 0.0
+                # 加上新增人员的值
+                for r in range(total_row + 1, last_new_row + 1):
+                    v = summary_sheet.cell(row=r, column=col_idx).value
+                    if v and isinstance(v, (int, float)):
+                        grand_val += float(v)
+                summary_sheet.cell(row=new_grand_total_row, column=col_idx,
+                                   value=round(grand_val, 2))
 
 
 # ============================================================
