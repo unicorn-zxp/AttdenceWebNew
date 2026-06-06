@@ -245,10 +245,15 @@
                   <div class="rules-list">
                     <div class="rule-item"><span class="rule-dot"></span>排除工种：管理、安全员、资料员、技术员等</div>
                     <div class="rule-item"><span class="rule-dot"></span>每日仅一次打卡视为异常，不计入报表</div>
-                    <div class="rule-item"><span class="rule-dot"></span>早班进位：打卡时间 &le; 07:40 按 07:30 计算</div>
+                    <div class="rule-item"><span class="rule-dot"></span>早班进位：打卡时间 &le; {{ store.workStartTime }} + 10分钟 按 {{ store.workStartTime }} 计算，早到不算工时</div>
                     <div class="rule-item"><span class="rule-dot"></span>晚班补齐：距整点/半点 &le; {{ store.lateTolerance }}分钟则补齐</div>
                     <div class="rule-item"><span class="rule-dot"></span>工时取整：按半小时向下取整</div>
-                    <div class="rule-item"><span class="rule-dot"></span>加班分界：16:30 后算加班</div>
+                    <div class="rule-item"><span class="rule-dot"></span>加班分界：{{ store.workEndTime }} 后算加班</div>
+                    <div class="rule-item"><span class="rule-dot"></span>工资公式：额定内 (日工资+时薪)/额定工时 &times; 实际工时，超出部分按时薪计算</div>
+                  </div>
+                  <div class="rules-config-hint">
+                    <el-icon><Setting /></el-icon>
+                    可在侧边栏调整上班时间、下班时间、休息时间等配置
                   </div>
                 </el-collapse-item>
               </el-collapse>
@@ -753,6 +758,17 @@ onMounted(async () => {
   border-radius: 50%;
   background: var(--color-text-tertiary);
   flex-shrink: 0;
+}
+.rules-config-hint {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-brand);
+  background: rgba(79, 70, 229, 0.06);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 /* ===== Responsive ===== */

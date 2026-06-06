@@ -22,7 +22,41 @@ EXCLUDED_JOB_TYPES = {'管理', '安全员', '资料员', '技术员', '安全',
 
 # 默认配置
 DEFAULT_LATE_TOLERANCE = 10  # 晚班弹性补齐容差(分钟)
-DEFAULT_OVERTIME_CUTOVER = time(16, 30)  # 加班分界时间
+DEFAULT_WORK_START = time(7, 30)    # 默认上班时间
+DEFAULT_WORK_END = time(17, 30)     # 默认下班时间
+DEFAULT_BREAK_START = time(12, 0)   # 默认休息开始
+DEFAULT_BREAK_END = time(13, 0)     # 默认休息结束
+
+
+def compute_rated_hours(
+    work_start: time = DEFAULT_WORK_START,
+    work_end: time = DEFAULT_WORK_END,
+    break_start: time = DEFAULT_BREAK_START,
+    break_end: time = DEFAULT_BREAK_END,
+) -> float:
+    """根据上下班时间和休息时间推导额定工时（小时）"""
+    ws = work_start.hour * 60 + work_start.minute
+    we = work_end.hour * 60 + work_end.minute
+    bs = break_start.hour * 60 + break_start.minute
+    be = break_end.hour * 60 + break_end.minute
+
+    total = we - ws
+    # 计算休息重叠
+    overlap_start = max(ws, bs)
+    overlap_end = min(we, be)
+    break_overlap = max(0, overlap_end - overlap_start)
+
+    return (total - break_overlap) / 60.0
+
+
+def compute_break_overlap_minutes(start_mins: int, end_mins: int,
+                                   break_start: time, break_end: time) -> int:
+    """计算给定时段与休息窗口的重叠分钟数"""
+    bs = break_start.hour * 60 + break_start.minute
+    be = break_end.hour * 60 + break_end.minute
+    overlap_start = max(start_mins, bs)
+    overlap_end = min(end_mins, be)
+    return max(0, overlap_end - overlap_start)
 
 
 # ============================================================
@@ -227,11 +261,13 @@ def parse_attendance(file_paths: List[str]) -> pd.DataFrame:
 # 3. 工时计算引擎（保持原有逻辑）
 # ============================================================
 
-def apply_early_rounding(punch_time: time) -> time:
-    """早班弹性进位: 任何 ≤ 07:40 的打卡时间都按 07:30 计"""
-    minutes = punch_time.hour * 60 + punch_time.minute
-    if minutes <= 7 * 60 + 40:
-        return time(7, 30)
+def apply_early_rounding(punch_time: time, work_start: time = DEFAULT_WORK_START) -> time:
+    """早班弹性进位: ≤ work_start + 10min 的打卡时间按 work_start 计;
+    早于 work_start 的也进位到 work_start（早到不算工时）"""
+    ws_mins = work_start.hour * 60 + work_start.minute
+    punch_mins = punch_time.hour * 60 + punch_time.minute
+    if punch_mins <= ws_mins + 10:
+        return work_start
     return punch_time
 
 
@@ -247,16 +283,24 @@ def apply_late_rounding(punch_time: time, tolerance: int = DEFAULT_LATE_TOLERANC
     return punch_time
 
 
-def calculate_base_overtime_hours(
+def calculate_work_hours(
     times: List[time],
-    overtime_cutoff: time = DEFAULT_OVERTIME_CUTOVER,
+    work_start: time = DEFAULT_WORK_START,
+    work_end: time = DEFAULT_WORK_END,
+    break_start: time = DEFAULT_BREAK_START,
+    break_end: time = DEFAULT_BREAK_END,
+    tolerance: int = DEFAULT_LATE_TOLERANCE,
     for_settlement: bool = False
 ) -> Tuple[float, float, bool]:
     """
-    计算每日基本工时和加班工时(以16:30为分界点)
+    计算每日下班前工时和下班后工时
+
+    - 早于 work_start 的打卡进位到 work_start
+    - 下班前工时 = (work_end - 有效上班) - 休息重叠
+    - 下班后工时 = max(0, 最晚打卡 - work_end)
 
     Returns:
-        (基本工时, 加班工时, 是否异常)
+        (下班前工时, 下班后工时, 是否异常)
     """
     if len(times) < 2:
         return 0.0, 0.0, True
@@ -265,46 +309,38 @@ def calculate_base_overtime_hours(
     latest = max(times)
 
     if for_settlement:
-        earliest = apply_early_rounding(earliest)
-        latest = apply_late_rounding(latest)
+        earliest = apply_early_rounding(earliest, work_start)
+        latest = apply_late_rounding(latest, tolerance)
 
-    earliest_minutes = earliest.hour * 60 + earliest.minute
-    latest_minutes = latest.hour * 60 + latest.minute
-    cutoff_minutes = overtime_cutoff.hour * 60 + overtime_cutoff.minute
+    earliest_mins = earliest.hour * 60 + earliest.minute
+    latest_mins = latest.hour * 60 + latest.minute
+    work_end_mins = work_end.hour * 60 + work_end.minute
 
-    if latest_minutes < earliest_minutes:
-        latest_minutes += 24 * 60
+    if latest_mins < earliest_mins:
+        latest_mins += 24 * 60
 
-    # 计算基本工时
-    base_minutes = 0
-    if earliest_minutes < cutoff_minutes:
-        base_minutes = min(cutoff_minutes, latest_minutes) - earliest_minutes
-        lunch_start = 12 * 60
-        lunch_end = 13 * 60
-        work_end = min(cutoff_minutes, latest_minutes)
-        overlap_start = max(earliest_minutes, lunch_start)
-        overlap_end = min(work_end, lunch_end)
-        if overlap_end > overlap_start:
-            base_minutes -= (overlap_end - overlap_start)
+    # 早到进位到上班时间
+    ws_mins = work_start.hour * 60 + work_start.minute
+    if earliest_mins < ws_mins:
+        earliest_mins = ws_mins
 
-    # 计算加班工时
-    overtime_minutes = 0
-    if latest_minutes > cutoff_minutes:
-        overtime_minutes = latest_minutes - max(cutoff_minutes, earliest_minutes)
+    # 下班前工时
+    before_end_mins = min(work_end_mins, latest_mins)
+    before_minutes = max(0, before_end_mins - earliest_mins)
+    before_minutes -= compute_break_overlap_minutes(
+        earliest_mins, before_end_mins, break_start, break_end)
 
-    if base_minutes < 0:
-        base_minutes = 0
-    if overtime_minutes < 0:
-        overtime_minutes = 0
+    # 下班后工时
+    after_minutes = max(0, latest_mins - work_end_mins)
 
-    base_hours = base_minutes / 60.0
-    overtime_hours = overtime_minutes / 60.0
+    before_hours = max(0.0, before_minutes / 60.0)
+    after_hours = max(0.0, after_minutes / 60.0)
 
     if for_settlement:
-        base_hours = int(base_hours * 2) / 2
-        overtime_hours = int(overtime_hours * 2) / 2
+        before_hours = int(before_hours * 2) / 2
+        after_hours = int(after_hours * 2) / 2
 
-    return base_hours, overtime_hours, False
+    return before_hours, after_hours, False
 
 
 # ============================================================
@@ -313,7 +349,12 @@ def calculate_base_overtime_hours(
 
 def process_xdz_data(
     attendance_df: pd.DataFrame,
-    roster_dict: Dict[str, dict]
+    roster_dict: Dict[str, dict],
+    work_start: time = DEFAULT_WORK_START,
+    work_end: time = DEFAULT_WORK_END,
+    break_start: time = DEFAULT_BREAK_START,
+    break_end: time = DEFAULT_BREAK_END,
+    late_tolerance: int = DEFAULT_LATE_TOLERANCE,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     处理考勤数据，按花名册中的个人工资标准计算工资
@@ -326,6 +367,7 @@ def process_xdz_data(
     Returns:
         (工资汇总DataFrame, 每日考勤明细DataFrame)
     """
+    rated_hours = compute_rated_hours(work_start, work_end, break_start, break_end)
     grouped = attendance_df.groupby('姓名')
 
     salary_results = []
@@ -367,8 +409,14 @@ def process_xdz_data(
             times = times_df['打卡时间'].tolist()
             original_times = times.copy()
 
-            base_hours, overtime_hours, is_abnormal = calculate_base_overtime_hours(
-                times, for_settlement=True
+            before_hours, after_hours, is_abnormal = calculate_work_hours(
+                times,
+                work_start=work_start,
+                work_end=work_end,
+                break_start=break_start,
+                break_end=break_end,
+                tolerance=late_tolerance,
+                for_settlement=True
             )
 
             if is_abnormal:
@@ -388,18 +436,22 @@ def process_xdz_data(
                 })
                 continue
 
-            settle_hours = base_hours + overtime_hours
+            settle_hours = before_hours + after_hours
             if settle_hours <= 0:
                 continue
 
             valid_days += 1
-            total_base_hours += base_hours
-            total_overtime_hours += overtime_hours
+            total_base_hours += before_hours
+            total_overtime_hours += after_hours
 
             # 计算当日工资（有工资标准才计算）
             if has_wage:
-                daily_base_salary = (base_hours / 8) * daily_wage
-                daily_ot_salary = overtime_hours * hourly_wage
+                # 额定内工时 = min(下班前工时, 额定工时)
+                standard_hours = min(before_hours, rated_hours)
+                extra_before = max(0, before_hours - rated_hours)
+                # 工资 = (D+R)/H × 额定内工时 + R × 额外工时
+                daily_base_salary = (daily_wage + hourly_wage) / rated_hours * standard_hours
+                daily_ot_salary = hourly_wage * (extra_before + after_hours)
                 daily_total = daily_base_salary + daily_ot_salary
             else:
                 daily_base_salary = 0
@@ -418,8 +470,8 @@ def process_xdz_data(
                 '上班打卡时间': min(original_times),
                 '下班打卡时间': max(original_times),
                 '当日工时': settle_hours,
-                '基本工时': base_hours,
-                '加班工时': overtime_hours,
+                '基本工时': before_hours,
+                '加班工时': after_hours,
                 '当日基本工资': round(daily_base_salary, 2),
                 '当日加班工资': round(daily_ot_salary, 2),
                 '当日总工资': round(daily_total, 2),
@@ -428,8 +480,10 @@ def process_xdz_data(
 
         if valid_days > 0:
             if has_wage:
-                base_salary = (total_base_hours / 8) * daily_wage
-                overtime_salary = total_overtime_hours * hourly_wage
+                total_standard = min(total_base_hours, rated_hours * valid_days)
+                total_extra_before = max(0, total_base_hours - rated_hours * valid_days)
+                base_salary = (daily_wage + hourly_wage) / rated_hours * total_standard
+                overtime_salary = hourly_wage * (total_extra_before + total_overtime_hours)
                 total_salary = base_salary + overtime_salary
             else:
                 base_salary = 0

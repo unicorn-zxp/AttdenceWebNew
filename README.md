@@ -176,7 +176,11 @@ docker compose logs -f nginx
 ```python
 EXCLUDED_JOB_TYPES = {'管理', '安全员', '资料员', '技术员', '安全', '资料', '材料', '分包老板'}
 DEFAULT_LATE_TOLERANCE = 10          # 晚班弹性补齐容差(分钟)
-DEFAULT_OVERTIME_CUTOVER = time(16, 30)  # 加班分界时间
+DEFAULT_WORK_START = time(7, 30)     # 默认上班时间
+DEFAULT_WORK_END = time(17, 30)      # 默认下班时间
+DEFAULT_BREAK_START = time(12, 0)    # 默认休息开始
+DEFAULT_BREAK_END = time(13, 0)      # 默认休息结束
+# 额定工时自动推导: (work_end - work_start) - 休息重叠 = (17:30 - 07:30) - 1h = 9.0h
 ```
 
 ### 函数签名与数据流
@@ -214,8 +218,9 @@ DEFAULT_OVERTIME_CUTOVER = time(16, 30)  # 加班分界时间
           │                   │                       │
           └───────┬───────────┘                       │
                   ▼                                   │
-         process_xdz_data()                           │
-         (attendance_df, roster_dict)                  │
+         process_xdz_data(config...)                 │
+         (attendance_df, roster_dict,                  │
+          work_start/end, break_start/end, tolerance)  │
                   │                                   │
           ┌───────┴───────┐                           │
           ▼               ▼                           │
@@ -253,19 +258,25 @@ DEFAULT_OVERTIME_CUTOVER = time(16, 30)  # 加班分界时间
 - 按 (姓名, 日期, 打卡时间) 去重
 - 返回：DataFrame[姓名, 工号, 部门, 日期, 打卡时间]
 
-#### `process_xdz_data(attendance_df, roster_dict) -> Tuple[pd.DataFrame, pd.DataFrame]`
+#### `process_xdz_data(attendance_df, roster_dict, work_start, work_end, break_start, break_end, late_tolerance)`
 
 **核心计算引擎**，按个人工资标准匹配计算。
 
 - 按姓名分组，每日打卡数据计算工时
+- 额定工时自动推导：`H = (work_end - work_start) - 休息重叠`，默认 9.0h
 - 工时计算规则：
   - `<2次打卡 → 异常，工时=0`
-  - 最早打卡 `≤07:40 → 按07:30计`（早班进位）
-  - 最晚打卡距整点/半点 `≤10分钟 → 补齐`（晚班补齐，容差可配）
-  - 基本工时 = 打卡→16:30（扣除12:00-13:00午休）
-  - 加班工时 = 16:30→最晚打卡
+  - 早于 work_start 的打卡进位到 work_start（早到不算工时）
+  - 最早打卡 `≤work_start+10min → 按 work_start 计`（早班进位）
+  - 最晚打卡距整点/半点 `≤容差分钟 → 补齐`（晚班补齐，容差可配）
+  - 下班前工时 = work_end - 有效上班（扣除休息重叠，仅实际经过时扣）
+  - 下班后工时 = max(0, 最晚打卡 - work_end)
   - 按半小时向下取整
-- 工资计算：`基本工资 = (基本工时/8) × 工日工资`，`加班工资 = 加班工时 × 工时工资`
+- 工资计算（D=工日工资, R=工时工资, H=额定工时）：
+  - 额定内工时 = min(下班前工时, H)
+  - 额外工时 = max(0, 下班前工时-H) + 下班后工时
+  - `基本工资 = (D+R)/H × 额定内工时`
+  - `加班工资 = R × 额外工时`
 - 异常处理：花名册无此人/排除工种/无工资标准 → 保留考勤，不计算工资
 
 **salary_df 列**：序号, 姓名, 工种, 出勤工日, 日工资, 加班工时, 加班工资, 工资总额, 未支付数, 备注
@@ -339,7 +350,7 @@ Response:
 ```
 POST   /api/session                        → 创建会话
 DELETE /api/session/{session_id}            → 删除会话（重置）
-PUT    /api/config?session_id=&late_tolerance=  → 更新容差配置
+PUT    /api/config?session_id=&late_tolerance=&work_start_time=&work_end_time=&break_start=&break_end=  → 更新计算配置
 ```
 
 **POST /api/session**
@@ -440,7 +451,7 @@ POST /api/calculate
   → parse_xdz_roster(roster_path)
   → parse_attendance(attendance_paths)
   → get_attendance_date_range(attendance_paths)
-  → process_xdz_data(attendance_df, roster_dict)
+  → process_xdz_data(attendance_df, roster_dict, work_start, work_end, break_start, break_end, late_tolerance)
   → generate_attendance_summary(daily_df, ...)
   → generate_ledger_sheet(ledger_path, ..., salary_df, ...)
   → generate_report_format(daily_df, roster_path, ...)
@@ -644,6 +655,10 @@ Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
 | `sheetName` | `string` | 新增Sheet名称 |
 | `abnormalCount` | `number` | 异常人数 |
 | `lateTolerance` | `number` | 晚班容差配置 |
+| `workStartTime` | `string` | 上班时间（默认 "07:30"） |
+| `workEndTime` | `string` | 下班时间（默认 "17:30"） |
+| `breakStart` | `string` | 休息开始（默认 "12:00"） |
+| `breakEnd` | `string` | 休息结束（默认 "13:00"） |
 | `error` | `string` | 错误信息 |
 | `annualData` | `AnnualMonth[]` | ★ 年度月度汇总（按项目从 SQLite 读取） |
 
@@ -665,7 +680,7 @@ Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
 | `App.vue` | 主布局：顶部栏(项目选择器+数据看板/考勤计算双Tab) + 可折叠深色侧边栏 280px + 可滚动内容区 |
 | `DashboardView` | ★ 数据看板 Tab：年度工资总览（4色KPI卡片 + 柱状图 + 月度明细表），按项目加载 |
 | `FileUploadPanel` | 3 个上传项，深色适配，步骤编号圆圈（完成变绿勾），等宽排列 |
-| `ConfigPanel` | 晚班容差滑块，深色适配，容差值放大显示，规则放入半透明圆角卡片 |
+| `ConfigPanel` | 上班/下班/休息时间选择器 + 额定工时标签 + 晚班容差滑块 + 规则说明卡片，深色适配 |
 | `AlertBanner` | 左边框彩色卡片（warning=amber / success=emerald），点击折叠展开异常表格 |
 | `OverviewCards` | 4 色 KPI 卡片（indigo/emerald/orange/red），彩色图标圆圈 + 大号数值，hover 上移效果 |
 | `YearSummaryChart` | ★ 年度工资汇总：4 张大号累计 KPI 卡片 + 柱状图 + 月度明细表，数据从 SQLite 加载 |
@@ -686,7 +701,7 @@ Vue 3 + TypeScript + Element Plus + Pinia + ECharts + Axios + Vite
    b. 「考勤计算」Tab — 侧边栏 + 计算流程
 4. 切换项目 → 重置会话 → 重新拉取该项目年度数据
 5. 侧边栏上传 3 个文件（按钮逐一变绿，台账上传时按项目 seed 历史月份到 DB）
-6. 调整容差配置（可选）
+6. 调整计算配置（上班/下班/休息时间、晚班容差，可选）
 7. 点击"开始计算" → loading 状态
 8. 计算完成 → 自动切换到「考勤计算」Tab → fade 过渡到结果页面：
    异常告警 → 当月 KPI 卡片 → 工种图表 → 工资表 → 考勤明细 → 下载卡片
@@ -918,4 +933,5 @@ E2E 测试结果：176条工资记录，工资总额 ¥1,180,417.48。
 | 总计行纳入新员工 | 总计行 = 缓存原值 + 新增人员各项总和，确保新工人纳入统计 |
 | 前端公司品牌标识 | 顶部栏和侧边栏统一显示"合肥创新智成"，数据看板副标题动态项目名 |
 | 台账下载原始文件名 | 下载台账使用上传时的文件名，不再硬编码 |
+| 考勤规则可配置化 | 上班/下班/休息时间可配置，额定工时自动推导，工资公式按 (D+R)/H×实际+R×额外 计算 |
 | 顶部栏 64px 重构 | 品牌区+Tab导航左对齐，状态+项目选择右对齐，分隔符区分层级 |

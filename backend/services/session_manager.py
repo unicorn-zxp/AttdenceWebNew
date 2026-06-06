@@ -32,6 +32,10 @@ class SessionData:
         # Config
         self.late_tolerance: int = 10
         self.project_id: int = 1
+        self.work_start_time: str = "07:30"
+        self.work_end_time: str = "17:30"
+        self.break_start: str = "12:00"
+        self.break_end: str = "13:00"
 
         # Results
         self.salary_records: Optional[list[dict]] = None

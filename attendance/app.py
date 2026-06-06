@@ -24,7 +24,11 @@ from attendance_core import (
     get_attendance_date_range,
     format_date_range_sheet_name,
     DEFAULT_LATE_TOLERANCE,
-    DEFAULT_OVERTIME_CUTOVER,
+    DEFAULT_WORK_START,
+    DEFAULT_WORK_END,
+    DEFAULT_BREAK_START,
+    DEFAULT_BREAK_END,
+    compute_rated_hours,
 )
 
 
@@ -37,6 +41,11 @@ def run_calculation(
     attendance_paths: list,
     ledger_path: str,
     output_dir: str,
+    work_start=None,
+    work_end=None,
+    break_start=None,
+    break_end=None,
+    late_tolerance=None,
 ):
     """执行考勤工资计算，返回三个输出文件路径"""
     # 1. 解析花名册
@@ -53,7 +62,14 @@ def run_calculation(
     sheet_name = format_date_range_sheet_name(start_date, end_date)
 
     # 4. 计算工时和工资
-    salary_df, daily_df = process_xdz_data(attendance_df, roster_dict)
+    from datetime import time as dt_time
+    kwargs = {}
+    if work_start: kwargs['work_start'] = work_start
+    if work_end: kwargs['work_end'] = work_end
+    if break_start: kwargs['break_start'] = break_start
+    if break_end: kwargs['break_end'] = break_end
+    if late_tolerance: kwargs['late_tolerance'] = late_tolerance
+    salary_df, daily_df = process_xdz_data(attendance_df, roster_dict, **kwargs)
 
     # 5. 生成三个输出文件
     # A. 考勤记录汇总
@@ -142,6 +158,12 @@ ledger_file = st.sidebar.file_uploader(
 
 # 容差配置
 st.sidebar.markdown("### ⚙️ 计算配置")
+
+work_start_str = st.sidebar.text_input("上班时间", value=DEFAULT_WORK_START.strftime("%H:%M"))
+work_end_str = st.sidebar.text_input("下班时间", value=DEFAULT_WORK_END.strftime("%H:%M"))
+break_start_str = st.sidebar.text_input("休息开始", value=DEFAULT_BREAK_START.strftime("%H:%M"))
+break_end_str = st.sidebar.text_input("休息结束", value=DEFAULT_BREAK_END.strftime("%H:%M"))
+
 late_tolerance = st.sidebar.slider(
     "晚班弹性补齐容差（分钟）",
     min_value=1,
@@ -150,12 +172,24 @@ late_tolerance = st.sidebar.slider(
     help="距整点/半点≤此分钟数则补齐"
 )
 
+def _parse_time_str(s: str):
+    parts = s.strip().split(":")
+    from datetime import time as dt_time
+    return dt_time(int(parts[0]), int(parts[1]))
+
+work_start_cfg = _parse_time_str(work_start_str)
+work_end_cfg = _parse_time_str(work_end_str)
+break_start_cfg = _parse_time_str(break_start_str)
+break_end_cfg = _parse_time_str(break_end_str)
+rated_h = compute_rated_hours(work_start_cfg, work_end_cfg, break_start_cfg, break_end_cfg)
+
 st.sidebar.markdown(f"""
 **当前规则**：
-- 早班进位: ≤ 07:40 按 07:30 计
+- 额定工时: {rated_h} 小时
+- 早班进位: ≤ 上班时间+10分钟 按 {work_start_str} 计
 - 晚班补齐: 距整点/半点 ≤ {late_tolerance}分钟 则补齐
 - 工时取整: 按半小时向下取整
-- 加班分界: 16:30 后算加班
+- 加班分界: {work_end_str} 后算加班
 """)
 
 
@@ -192,10 +226,11 @@ if not roster_file or not attendance_files or not ledger_file:
         ### 计算规则
         - **排除工种**: 管理、安全员、资料员、技术员、安全、资料、材料、分包老板
         - **异常判定**: 每日仅有一次打卡视为异常，不计入报表
-        - **早班进位**: 打卡时间 ≤ 07:40，按 07:30 计算
+        - **早班进位**: 打卡时间 ≤ 上班时间+10分钟，按上班时间计算；早到不算工时
         - **晚班补齐**: 距整点/半点 ≤ {late_tolerance}分钟则补齐（可配置）
         - **工时取整**: 按半小时向下取整（如 7.25h → 7.0h, 7.5h → 7.5h）
-        - **加班分界**: 16:30 后算加班
+        - **额定工时**: 根据上下班时间和休息时间自动推导
+        - **工资公式**: 额定内按 (日工资+时薪)/额定工时 × 实际工时，超出部分按时薪计算
 
         ### 异常处理
         - 考勤有但花名册无此人的 → 保留考勤记录，不计算工资，备注说明
@@ -243,6 +278,11 @@ if st.sidebar.button("🚀 开始计算", type="primary", width='stretch', key="
                 attendance_paths=attendance_paths,
                 ledger_path=ledger_path,
                 output_dir=temp_dir,
+                work_start=work_start_cfg,
+                work_end=work_end_cfg,
+                break_start=break_start_cfg,
+                break_end=break_end_cfg,
+                late_tolerance=late_tolerance,
             )
 
             # 保存到session

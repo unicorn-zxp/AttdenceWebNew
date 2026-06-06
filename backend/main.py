@@ -65,12 +65,30 @@ async def delete_session(session_id: str):
 
 
 @app.put("/api/config")
-async def update_config(session_id: str = Query(...), late_tolerance: int = 10):
+async def update_config(
+    session_id: str = Query(...),
+    late_tolerance: int = 10,
+    work_start_time: str = "07:30",
+    work_end_time: str = "17:30",
+    break_start: str = "12:00",
+    break_end: str = "13:00",
+):
     session = session_manager.get_session(session_id)
     if not session:
         raise HTTPException(404, "会话不存在")
     session.late_tolerance = late_tolerance
-    return {"status": "ok", "late_tolerance": late_tolerance}
+    session.work_start_time = work_start_time
+    session.work_end_time = work_end_time
+    session.break_start = break_start
+    session.break_end = break_end
+    return {
+        "status": "ok",
+        "late_tolerance": late_tolerance,
+        "work_start_time": work_start_time,
+        "work_end_time": work_end_time,
+        "break_start": break_start,
+        "break_end": break_end,
+    }
 
 
 @app.get("/api/health")

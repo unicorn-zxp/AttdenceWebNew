@@ -28,7 +28,9 @@ def _run_calculation(session):
         generate_report_format,
         get_attendance_date_range,
         format_date_range_sheet_name,
+        compute_rated_hours,
     )
+    from datetime import time as dt_time
 
     output_dir = session.temp_dir
     project_id = getattr(session, "project_id", 1)
@@ -46,8 +48,19 @@ def _run_calculation(session):
 
     sheet_name = format_date_range_sheet_name(start_date, end_date)
 
-    # 4. Process data
-    salary_df, daily_df = process_xdz_data(attendance_df, roster_dict)
+    # 4. Process data with config
+    def _parse_time(s: str) -> dt_time:
+        parts = s.strip().split(":")
+        return dt_time(int(parts[0]), int(parts[1]))
+
+    salary_df, daily_df = process_xdz_data(
+        attendance_df, roster_dict,
+        work_start=_parse_time(getattr(session, "work_start_time", "07:30")),
+        work_end=_parse_time(getattr(session, "work_end_time", "17:30")),
+        break_start=_parse_time(getattr(session, "break_start", "12:00")),
+        break_end=_parse_time(getattr(session, "break_end", "13:00")),
+        late_tolerance=getattr(session, "late_tolerance", 10),
+    )
 
     # 5. Generate output files
     # A. Attendance summary

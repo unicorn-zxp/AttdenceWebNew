@@ -17,6 +17,10 @@ class UploadStatus(BaseModel):
 
 class ConfigUpdate(BaseModel):
     late_tolerance: int = 10
+    work_start_time: str = "07:30"
+    work_end_time: str = "17:30"
+    break_start: str = "12:00"
+    break_end: str = "13:00"
 
 
 class OverviewStats(BaseModel):

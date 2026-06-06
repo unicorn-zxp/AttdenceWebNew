@@ -233,10 +233,10 @@ def parse_attendance(file_paths: List[str]) -> pd.DataFrame
 #### `apply_early_rounding`
 
 ```python
-def apply_early_rounding(punch_time: time) -> time
+def apply_early_rounding(punch_time: time, work_start: time = DEFAULT_WORK_START) -> time
 ```
 
-早班弹性进位：打卡时间 ≤ 07:40 时，统一按 07:30 计算。
+早班弹性进位：打卡时间 ≤ `work_start + 10min` 时按 `work_start` 计算；早于 `work_start` 的也进位到 `work_start`（早到不算工时）。
 
 #### `apply_late_rounding`
 
@@ -252,43 +252,52 @@ def apply_late_rounding(punch_time: time, tolerance: int = 5) -> time
 | 17:58 | ≤5min到18:00 | 18:00 |
 | 17:35 | 不满足 | 17:35 |
 
-#### `calculate_base_overtime_hours`
+#### `calculate_work_hours`
 
 ```python
-def calculate_base_overtime_hours(
+def calculate_work_hours(
     times: List[time],
-    overtime_cutoff: time = time(16, 30),
+    work_start: time = DEFAULT_WORK_START,
+    work_end: time = DEFAULT_WORK_END,
+    break_start: time = DEFAULT_BREAK_START,
+    break_end: time = DEFAULT_BREAK_END,
+    tolerance: int = DEFAULT_LATE_TOLERANCE,
     for_settlement: bool = False
 ) -> Tuple[float, float, bool]
 ```
 
-**功能**: 计算每日基本工时和加班工时。
+**功能**: 计算每日下班前工时和下班后工时。
 
 **输入**:
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `times` | `List[time]` | 当天所有打卡时间 |
-| `overtime_cutoff` | `time` | 加班分界时间，默认 16:30 |
+| `work_start` | `time` | 上班时间，默认 07:30 |
+| `work_end` | `time` | 下班时间，默认 17:30 |
+| `break_start` | `time` | 休息开始时间，默认 12:00 |
+| `break_end` | `time` | 休息结束时间，默认 13:00 |
+| `tolerance` | `int` | 晚班弹性容差（分钟） |
 | `for_settlement` | `bool` | 是否为结算模式（应用弹性进位和取整） |
 
-**输出**: `(基本工时, 加班工时, 是否异常)`
+**输出**: `(下班前工时, 下班后工时, 是否异常)`
 
 **计算逻辑**:
 1. 少于2次打卡 → 返回 `(0, 0, True)` 异常
 2. 取最早和最晚打卡时间
 3. 结算模式下应用 `apply_early_rounding` 和 `apply_late_rounding`
-4. **基本工时** = 上班时间 → 16:30，扣除午休（12:00-13:00 交集）
-5. **加班工时** = 16:30 → 下班时间
-6. 结算模式下按半小时向下取整：`int(hours * 2) / 2`
+4. 早于 `work_start` 的打卡进位到 `work_start`（早到不算工时）
+5. **下班前工时** = `work_end - 有效上班`，扣除休息重叠（仅当打卡区间实际经过休息窗口时扣除）
+6. **下班后工时** = `max(0, 最晚打卡 - work_end)`
+7. 结算模式下按半小时向下取整：`int(hours * 2) / 2`
 
-**计算示例**:
-| 上班 | 下班 | 基本工时 | 加班工时 | 说明 |
-|------|------|----------|----------|------|
-| 07:30 | 16:30 | 8.0 | 0.0 | 标准全天 |
-| 07:30 | 18:00 | 8.0 | 1.5 | 加班1.5h |
-| 13:00 | 21:00 | 3.5 | 4.5 | 下午班 |
-| 09:00 | 16:30 | 6.5 | 0.0 | 无午休扣除 |
-| 06:50 | 17:27 | 8.0 | 1.0 | 弹性进位+补齐 |
+**计算示例**（默认配置 07:30-17:30，休息12:00-13:00，额定9h）:
+| 上班 | 下班 | 下班前 | 下班后 | 总工时 | 说明 |
+|------|------|--------|--------|--------|------|
+| 07:30 | 17:30 | 9.0 | 0.0 | 9.0 | 标准全天 |
+| 07:30 | 19:30 | 9.0 | 2.0 | 11.0 | 加班2h |
+| 13:00 | 23:00 | 4.5 | 5.5 | 10.0 | 下午班（无休息扣除） |
+| 09:00 | 17:30 | 7.5 | 0.0 | 7.5 | 迟到（无午休扣除） |
+| 05:30 | 17:30 | 9.0 | 0.0 | 9.0 | 早到进位到07:30 |
 
 ---
 
@@ -297,7 +306,12 @@ def calculate_base_overtime_hours(
 ```python
 def process_xdz_data(
     attendance_df: pd.DataFrame,
-    roster_dict: Dict[str, dict]
+    roster_dict: Dict[str, dict],
+    work_start: time = DEFAULT_WORK_START,
+    work_end: time = DEFAULT_WORK_END,
+    break_start: time = DEFAULT_BREAK_START,
+    break_end: time = DEFAULT_BREAK_END,
+    late_tolerance: int = DEFAULT_LATE_TOLERANCE,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]
 ```
 
@@ -308,6 +322,11 @@ def process_xdz_data(
 |------|------|------|
 | `attendance_df` | `DataFrame` | `parse_attendance` 的输出 |
 | `roster_dict` | `Dict[str, dict]` | `parse_xdz_roster` 的输出 |
+| `work_start` | `time` | 上班时间，默认 07:30 |
+| `work_end` | `time` | 下班时间，默认 17:30 |
+| `break_start` | `time` | 休息开始时间，默认 12:00 |
+| `break_end` | `time` | 休息结束时间，默认 13:00 |
+| `late_tolerance` | `int` | 晚班弹性容差（分钟），默认 10 |
 
 **输出**: `(salary_df, daily_df)`
 
@@ -336,19 +355,31 @@ def process_xdz_data(
 | `上班打卡时间` | `time` | 当天最早打卡 |
 | `下班打卡时间` | `time` | 当天最晚打卡 |
 | `当日工时` | `float` | 基本工时 + 加班工时 |
-| `基本工时` | `float` | 上班→16:30（扣午休） |
-| `加班工时` | `float` | 16:30→下班 |
-| `当日基本工资` | `float` | `基本工时 / 8 × 工日工资` |
-| `当日加班工资` | `float` | `加班工时 × 工时工资` |
+| `基本工时` | `float` | 下班前工时（扣休息重叠） |
+| `加班工时` | `float` | 下班后工时 |
+| `当日基本工资` | `float` | `(D+R)/H × min(下班前, H)` |
+| `当日加班工资` | `float` | `R × (max(下班前-H, 0) + 下班后)` |
 | `当日总工资` | `float` | 基本工资 + 加班工资 |
 | `备注` | `str` | 异常说明（如"包含多次打卡:06:50, 12:00, 17:30"） |
 
-**工资计算公式**:
+**工资计算公式**（D=工日工资, R=工时工资, H=额定工时）:
 ```
-当日基本工资 = (基本工时 / 8) × 工日工资
-当日加班工资 = 加班工时 × 工时工资
-当日总工资 = 当日基本工资 + 当日加班工资
+额定内工时 = min(下班前工时, H)
+额外工时   = max(0, 下班前工时 - H) + 下班后工时
+
+当日基本工资 = (D + R) / H × 额定内工时
+当日加班工资 = R × 额外工时
+当日总工资   = 当日基本工资 + 当日加班工资
 ```
+
+**计算示例**（D=350, R=50, H=9）:
+| 场景 | 下班前 | 下班后 | 工资计算 | 总工资 |
+|------|--------|--------|----------|--------|
+| 标准全天 07:30-17:30 | 9.0h | 0h | 400/9×9 | 400.0 |
+| 加班 07:30-19:30 | 9.0h | 2.0h | 400+50×2 | 500.0 |
+| 下午班 13:00-23:00 | 4.5h | 5.5h | 400/9×4.5+50×5.5 | 475.0 |
+| 早到 05:30-17:30 | 9.0h | 0h | 400/9×9（进位到07:30） | 400.0 |
+| 迟到 09:00-17:30 | 7.5h | 0h | 400/9×7.5 | 333.3 |
 
 **只有满足以下全部条件才计算工资**（否则各工资列为0）:
 - 花名册中存在此人
@@ -585,7 +616,12 @@ def generate_report_format(
 ### 配置项
 | 配置 | 范围 | 默认 |
 |------|------|------|
+| 上班时间 | 05:00-12:00（步长30分钟） | 07:30 |
+| 下班时间 | 14:00-23:00（步长30分钟） | 17:30 |
+| 休息开始 | 10:00-15:00（步长30分钟） | 12:00 |
+| 休息结束 | 11:00-16:00（步长30分钟） | 13:00 |
 | 晚班弹性补齐容差 | 1-15 分钟 | 10 |
+| 额定工时 | 自动推导 = (下班-上班-休息重叠) | 9.0 |
 
 ### 结果展示
 - 异常人员提示（展开查看无工资标准的人员列表）
@@ -612,11 +648,16 @@ def generate_report_format(
 # 不参与工资计算的工种
 EXCLUDED_JOB_TYPES = {'管理', '安全员', '资料员', '技术员', '安全', '资料', '材料', '分包老板'}
 
-# 晚班弹性补齐容差（分钟）
-DEFAULT_LATE_TOLERANCE = 10
+# 默认配置
+DEFAULT_LATE_TOLERANCE = 10          # 晚班弹性补齐容差(分钟)
+DEFAULT_WORK_START = time(7, 30)     # 默认上班时间
+DEFAULT_WORK_END = time(17, 30)      # 默认下班时间
+DEFAULT_BREAK_START = time(12, 0)    # 默认休息开始
+DEFAULT_BREAK_END = time(13, 0)      # 默认休息结束
 
-# 加班分界时间
-DEFAULT_OVERTIME_CUTOVER = time(16, 30)
+# 额定工时自动推导
+# rated_hours = (work_end - work_start) - 休息重叠(work_start, work_end, break_start, break_end)
+# 默认: (17:30 - 07:30) - 1h = 9.0h
 ```
 
 ---
@@ -641,7 +682,7 @@ hours = int(hours * 2) / 2
 
 ### 午休扣除
 
-基本工时计算中自动扣除 12:00-13:00 午休时间段（仅当工作时间覆盖该时段时扣除交集部分）。
+工时计算中自动扣除休息时间段（默认 12:00-13:00），仅当打卡区间实际经过休息窗口时才扣除交集部分（如下午班 13:00-23:00 不经过休息窗口则不扣除）。休息时间段可通过配置调整。
 
 ### 异常打卡
 

@@ -38,6 +38,10 @@ export const useAttendanceStore = defineStore('attendance', () => {
   const sheetName = ref('')
   const abnormalCount = ref(0)
   const lateTolerance = ref(10)
+  const workStartTime = ref('07:30')
+  const workEndTime = ref('17:30')
+  const breakStart = ref('12:00')
+  const breakEnd = ref('13:00')
   const error = ref('')
   const annualData = ref<AnnualMonth[]>([])
 
@@ -209,9 +213,19 @@ export const useAttendanceStore = defineStore('attendance', () => {
     await initSession()
   }
 
-  async function updateConfig(tolerance: number) {
-    lateTolerance.value = tolerance
-    await client.put('/config', null, { params: { late_tolerance: tolerance } })
+  async function updateConfig(params: {
+    late_tolerance?: number
+    work_start_time?: string
+    work_end_time?: string
+    break_start?: string
+    break_end?: string
+  }) {
+    if (params.late_tolerance !== undefined) lateTolerance.value = params.late_tolerance
+    if (params.work_start_time !== undefined) workStartTime.value = params.work_start_time
+    if (params.work_end_time !== undefined) workEndTime.value = params.work_end_time
+    if (params.break_start !== undefined) breakStart.value = params.break_start
+    if (params.break_end !== undefined) breakEnd.value = params.break_end
+    await client.put('/config', null, { params })
   }
 
   function getDownloadUrl(type: string): string {
@@ -238,6 +252,10 @@ export const useAttendanceStore = defineStore('attendance', () => {
     sheetName,
     abnormalCount,
     lateTolerance,
+    workStartTime,
+    workEndTime,
+    breakStart,
+    breakEnd,
     error,
     annualData,
     allUploaded,
