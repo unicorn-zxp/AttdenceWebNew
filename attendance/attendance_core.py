@@ -450,7 +450,7 @@ def process_xdz_data(
                 standard_hours = min(before_hours, rated_hours)
                 extra_before = max(0, before_hours - rated_hours)
                 # 工资 = (D+R)/H × 额定内工时 + R × 额外工时
-                daily_base_salary = (daily_wage + hourly_wage) / rated_hours * standard_hours
+                daily_base_salary = (daily_wage + 2 * hourly_wage) / rated_hours * standard_hours
                 daily_ot_salary = hourly_wage * (extra_before + after_hours)
                 daily_total = daily_base_salary + daily_ot_salary
             else:
@@ -482,7 +482,7 @@ def process_xdz_data(
             if has_wage:
                 total_standard = min(total_base_hours, rated_hours * valid_days)
                 total_extra_before = max(0, total_base_hours - rated_hours * valid_days)
-                base_salary = (daily_wage + hourly_wage) / rated_hours * total_standard
+                base_salary = (daily_wage + 2 * hourly_wage) / rated_hours * total_standard
                 overtime_salary = hourly_wage * (total_extra_before + total_overtime_hours)
                 total_salary = base_salary + overtime_salary
             else:

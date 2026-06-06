@@ -114,7 +114,7 @@
         </div>
         <div class="rule-line">
           <span class="rule-icon">&#9654;</span>
-          工资公式: 额定内 (日工资+时薪)/{{ ratedHours }}h &times; 实际工时，超出按时薪
+          工资公式: 额定内 (日工资+2&times;时薪)/{{ ratedHours }}h &times; 实际工时，超出按时薪
         </div>
       </div>
     </div>

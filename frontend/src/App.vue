@@ -249,7 +249,7 @@
                     <div class="rule-item"><span class="rule-dot"></span>晚班补齐：距整点/半点 &le; {{ store.lateTolerance }}分钟则补齐</div>
                     <div class="rule-item"><span class="rule-dot"></span>工时取整：按半小时向下取整</div>
                     <div class="rule-item"><span class="rule-dot"></span>加班分界：{{ store.workEndTime }} 后算加班</div>
-                    <div class="rule-item"><span class="rule-dot"></span>工资公式：额定内 (日工资+时薪)/额定工时 &times; 实际工时，超出部分按时薪计算</div>
+                    <div class="rule-item"><span class="rule-dot"></span>工资公式：额定内 (日工资+2&times;时薪)/额定工时 &times; 实际工时，超出部分按时薪计算</div>
                   </div>
                   <div class="rules-config-hint">
                     <el-icon><Setting /></el-icon>
